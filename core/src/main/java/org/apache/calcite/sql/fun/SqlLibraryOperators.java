@@ -720,4 +720,18 @@ public abstract class SqlLibraryOperators {
           ReturnTypes.BOOLEAN,
           InferTypes.FIRST_KNOWN,
           OperandTypes.COMPARABLE_UNORDERED_COMPARABLE_UNORDERED);
+
+  /**
+   * Array concatenation operator, '<code>||</code>'.
+   */
+  @LibraryOperator(libraries = { POSTGRESQL })
+  public static final SqlBinaryOperator ARRAY_CONCAT_OPERATOR =
+      new SqlBinaryOperator(
+          "||",
+          SqlKind.ARRAY_CONCAT,
+          60,
+          true,
+          ReturnTypes.LEAST_RESTRICTIVE,
+          null,
+          OperandTypes.AT_LEAST_ONE_SAME_VARIADIC);
 }

@@ -111,6 +111,7 @@ import static org.apache.calcite.sql.fun.SqlInternalOperators.THROW_UNLESS;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.ARRAY_AGG;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.ARRAY_CONCAT;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.ARRAY_CONCAT_AGG;
+import static org.apache.calcite.sql.fun.SqlLibraryOperators.ARRAY_CONCAT_OPERATOR;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.ARRAY_LENGTH;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.ARRAY_REVERSE;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.BOOL_AND;
@@ -522,6 +523,7 @@ public class RexImpTable {
     defineMethod(MEMBER_OF, BuiltInMethod.MEMBER_OF.method, NullPolicy.NONE);
     defineMethod(ARRAY_REVERSE, BuiltInMethod.ARRAY_REVERSE.method, NullPolicy.STRICT);
     map.put(ARRAY_CONCAT, new ArrayConcatImplementor());
+    map.put(ARRAY_CONCAT_OPERATOR, new ArrayConcatImplementor());
     final MethodImplementor isEmptyImplementor =
         new MethodImplementor(BuiltInMethod.IS_EMPTY.method, NullPolicy.NONE,
             false);

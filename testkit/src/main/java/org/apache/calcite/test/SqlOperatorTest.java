@@ -4877,6 +4877,15 @@ public class SqlOperatorTest {
     f.checkNull("array_concat(cast(null as integer array), array[1])");
   }
 
+  /** Tests {@code ARRAY_CONCAT_OPERATOR} function from PostgreSql. */
+  @Test void testArrayConcatOperator() {
+    SqlOperatorFixture f = fixture()
+        .setFor(SqlLibraryOperators.ARRAY_CONCAT_OPERATOR)
+        .withLibrary(SqlLibrary.POSTGRESQL);
+    f.checkScalar("array[1, 2] || array[2, 3]", "[1, 2, 2, 3]",
+        "INTEGER NOT NULL ARRAY NOT NULL");
+  }
+
   /** Tests {@code ARRAY_REVERSE} function from BigQuery. */
   @Test void testArrayReverseFunc() {
     SqlOperatorFixture f = fixture()
