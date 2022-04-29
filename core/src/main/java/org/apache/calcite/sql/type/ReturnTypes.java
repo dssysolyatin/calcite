@@ -190,7 +190,6 @@ public abstract class ReturnTypes {
 
   public static final SqlReturnTypeInference ARG0_INTERVAL_NULLABLE =
       ARG0_INTERVAL.andThen(SqlTypeTransforms.TO_NULLABLE);
-
   /**
    * Type-inference strategy whereby the result type of a call is the type of
    * the operand #0 (0-based), and nullable if the call occurs within a
