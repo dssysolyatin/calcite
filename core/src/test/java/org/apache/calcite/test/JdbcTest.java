@@ -2125,6 +2125,31 @@ public class JdbcTest {
             "EXPR$0=2");
   }
 
+  @Test void testSelectInsideFromAndList() {
+    // =========== QUERIES WORK =================
+    CalciteAssert.that()
+        .query("SELECT ARRAY(SELECT s.x)\n" +
+            "FROM (SELECT 1 as x) s")
+        .returnsValue("[{1}]");
+
+
+    // =========== QUERIES DOES NOT WORK =================
+    CalciteAssert.that()
+        .query("SELECT ARRAY(SELECT s.x)\n" +
+            "FROM (SELECT ARRAY[1,2,3] as x) s")
+        .returnsCount(1);
+
+    CalciteAssert.that()
+        .query("SELECT ARRAY(SELECT * FROM UNNEST(s.x) y)\n" +
+            "FROM (SELECT ARRAY[1,2,3] as x) s")
+        .returnsCount(1);
+
+    CalciteAssert.that()
+        .query("SELECT (SELECT CARDINALITY(s.x) LIMIT 1)\n" +
+            "FROM (SELECT ARRAY[1,2,3] as x) s")
+        .returnsUnordered("EXPR$0=3");
+  }
+
   @Test void testUnnestArrayWithOrdinality() {
     CalciteAssert.that()
         .query("select*from unnest(array[10,20]) with ordinality as t(i, o)")
