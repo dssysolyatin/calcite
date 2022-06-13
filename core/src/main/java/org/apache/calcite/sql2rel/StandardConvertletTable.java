@@ -96,6 +96,7 @@ import java.util.Objects;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.QUANTIFY_OPERATORS;
 import static org.apache.calcite.sql.type.NonNullableAccessors.getComponentTypeOrThrow;
 import static org.apache.calcite.util.Util.first;
 
@@ -208,6 +209,8 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
         new TimestampDiffConvertlet());
     registerOp(SqlLibraryOperators.TIMESTAMP_SUB,
         new TimestampSubConvertlet());
+
+    QUANTIFY_OPERATORS.forEach(operator -> registerOp(operator, StandardConvertletTable::convertQuantifyOperator));
 
     registerOp(SqlLibraryOperators.NVL, StandardConvertletTable::convertNvl);
     registerOp(SqlLibraryOperators.DECODE,
@@ -345,6 +348,25 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
             return cx.getRexBuilder().makeFieldAccess(expr, 0);
           });
     }
+  }
+
+  /** Converts ALL or SOME operators. */
+  private static RexNode convertQuantifyOperator(SqlRexContext cx, SqlCall call) {
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    final RexNode operand0 =
+        cx.convertExpression(call.getOperandList().get(0));
+    assert call.getOperandList().get(1) instanceof SqlNodeList;
+    final RexNode operand1 =
+        cx.convertExpression(((SqlNodeList) call.getOperandList().get(1)).get(0));
+    final RelDataType operand1ComponentType =
+        requireNonNull(operand1.getType().getComponentType());
+    final RelDataType returnType =
+        cx.getTypeFactory().createTypeWithNullability(cx.getTypeFactory().createSqlType(SqlTypeName.BOOLEAN), operand1.getType().isNullable() ||
+            operand0.getType().isNullable() || operand1ComponentType.isNullable());
+    return rexBuilder.makeCall(
+        returnType,
+        call.getOperator(),
+        ImmutableList.of(operand0, operand1));
   }
 
   /** Converts a call to the {@code NVL} function (and also its synonym,

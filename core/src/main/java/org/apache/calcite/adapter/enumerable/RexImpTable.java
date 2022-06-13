@@ -29,6 +29,7 @@ import org.apache.calcite.linq4j.tree.ConstantExpression;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.ExpressionType;
 import org.apache.calcite.linq4j.tree.Expressions;
+import org.apache.calcite.linq4j.tree.FunctionExpression;
 import org.apache.calcite.linq4j.tree.MemberExpression;
 import org.apache.calcite.linq4j.tree.MethodCallExpression;
 import org.apache.calcite.linq4j.tree.NewExpression;
@@ -60,6 +61,7 @@ import org.apache.calcite.sql.SqlTypeConstructorFunction;
 import org.apache.calcite.sql.SqlWindowTableFunction;
 import org.apache.calcite.sql.fun.SqlJsonArrayAggAggFunction;
 import org.apache.calcite.sql.fun.SqlJsonObjectAggAggFunction;
+import org.apache.calcite.sql.fun.SqlQuantifyOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.fun.SqlTrimFunction;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -188,6 +190,12 @@ import static org.apache.calcite.sql.fun.SqlLibraryOperators.UNIX_SECONDS;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.XML_TRANSFORM;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ABS;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ACOS;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ALL_EQ;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ALL_GE;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ALL_GT;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ALL_LE;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ALL_LT;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ALL_NE;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.AND;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ANY_VALUE;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.ARG_MAX;
@@ -330,6 +338,14 @@ import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SIN;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SINGLE_VALUE;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SLICE;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME_EQ;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME_GE;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME_GT;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME_LE;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME_LT;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SOME_NE;
+
+import static java.util.Objects.requireNonNull;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.STRUCT_ACCESS;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SUBMULTISET_OF;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.SUBSTRING;
@@ -346,8 +362,6 @@ import static org.apache.calcite.sql.fun.SqlStdOperatorTable.UNARY_MINUS;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.UNARY_PLUS;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.UPPER;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.USER;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * Contains implementations of Rex operators as Java code.
@@ -743,6 +757,19 @@ public class RexImpTable {
       map.put(CURRENT_ROLE, systemFunctionImplementor);
       map.put(CURRENT_CATALOG, systemFunctionImplementor);
 
+      defineQuantify(SOME_EQ, EQUALS);
+      defineQuantify(SOME_GT, GREATER_THAN);
+      defineQuantify(SOME_GE, GREATER_THAN_OR_EQUAL);
+      defineQuantify(SOME_LE, LESS_THAN_OR_EQUAL);
+      defineQuantify(SOME_LT, LESS_THAN);
+      defineQuantify(SOME_NE, NOT_EQUALS);
+      defineQuantify(ALL_EQ, EQUALS);
+      defineQuantify(ALL_GT, GREATER_THAN);
+      defineQuantify(ALL_GE, GREATER_THAN_OR_EQUAL);
+      defineQuantify(ALL_LE, LESS_THAN_OR_EQUAL);
+      defineQuantify(ALL_LT, LESS_THAN);
+      defineQuantify(ALL_NE, NOT_EQUALS);
+
       // Current time functions
       map.put(CURRENT_TIME, systemFunctionImplementor);
       map.put(CURRENT_TIMESTAMP, systemFunctionImplementor);
@@ -849,6 +876,11 @@ public class RexImpTable {
       map.put(operator,
           new BinaryImplementor(nullPolicy, true, expressionType,
               backupMethodName));
+    }
+
+    private void defineQuantify(SqlQuantifyOperator operator, SqlBinaryOperator binaryOperator) {
+      map.put(operator,
+          new QuantifyCollectionImplementor(binaryOperator, requireNonNull(map.get(binaryOperator))));
     }
   }
 
@@ -3504,7 +3536,7 @@ public class RexImpTable {
     }
 
     // E.g., "final boolean xxx_isNull = xxx_value == null"
-    private ParameterExpression genIsNullStatement(
+    final protected ParameterExpression genIsNullStatement(
         final RexToLixTranslator translator, final ParameterExpression value) {
       final ParameterExpression isNullVariable =
           Expressions.parameter(Boolean.TYPE,
@@ -4048,6 +4080,89 @@ public class RexImpTable {
               offsetExpr));
     }
   }
+
+  /**
+   * Implements
+   * <a href="https://www.postgresql.org/docs/current/functions-comparisons.html#id-1.5.8.30.16">
+   * ANY/SOME</a> and
+   * <a href="https://www.postgresql.org/docs/current/functions-comparisons.html#id-1.5.8.30.17">ALL</a>
+   * operators when the argument is an array or multiset expression.
+   */
+  private static class QuantifyCollectionImplementor extends AbstractRexCallImplementor {
+    private final SqlBinaryOperator binaryOperator;
+    private final RexCallImplementor binaryImplementor;
+
+    QuantifyCollectionImplementor(SqlBinaryOperator binaryOperator, RexCallImplementor binaryImplementor) {
+      super(NullPolicy.ANY, false);
+      this.binaryOperator = binaryOperator;
+      this.binaryImplementor = binaryImplementor;
+    }
+
+    @Override String getVariableName() {
+      return "quantify";
+    }
+
+    @Override Expression implementSafe(RexToLixTranslator translator, RexCall call,
+        List<Expression> argValueList) {
+      Expression left = argValueList.get(0);
+      Expression right = argValueList.get(1);
+      final RelDataType rightComponentType =
+          requireNonNull(call.getOperands().get(1).getType().getComponentType());
+      // If the array expression yields a null array, the result of SOME|ALL will be null
+      if (rightComponentType.getSqlTypeName() == SqlTypeName.NULL) {
+        return NULL_EXPR;
+      }
+
+      // final T _quantify_left_value = <>
+      // <Function1|Predicate1> lambda = new org.apache.calcite.linq4j.function.<Function1|Predicate1>() {
+      //    public Boolean apply(T el) {
+      //       return <binaryImplementor code>;
+      //    }
+      // }
+      // if the lambda returns java.lang.Boolean then the lambda can return null:
+      // return org.apache.calcite.runtime.SqlFunctions.<nullableExists|nullableSome>(_list, lambda)
+      // otherwise:
+      // return org.apache.calcite.linq4j.function.Functions.<exists|all>(_list, lambda)
+      BlockBuilder predicateLambdaBuilder = new BlockBuilder();
+      final ParameterExpression leftExpr =
+          Expressions.parameter(left.getType(), translator.getBlockBuilder().newName("_" + getVariableName() + "_left_value"));
+      // left should have final modifier otherwise it can not be passed to lambda
+      translator.getBlockBuilder().add(Expressions.declare(Modifier.FINAL, leftExpr, left));
+      RexNode leftRex = call.getOperands().get(0);
+      final ParameterExpression predicateArg =
+          Expressions.parameter(translator.typeFactory.getJavaClass(rightComponentType), "el");
+      final RexToLixTranslator.Result condition =
+          binaryImplementor.implement(
+              translator, (RexCall) translator.builder.makeCall(binaryOperator,
+                  leftRex, translator.builder.makeDynamicParam(rightComponentType, 0)),
+              ImmutableList.of(
+                  new RexToLixTranslator.Result(genIsNullStatement(translator, leftExpr), leftExpr),
+                  new RexToLixTranslator.Result(genIsNullStatement(translator, predicateArg), predicateArg)));
+      predicateLambdaBuilder.add(Expressions.return_(null, condition.valueVariable));
+      final FunctionExpression<?> predicate = Expressions.lambda(predicateLambdaBuilder.toBlock(), predicateArg);
+      return Expressions.call(getMethod(condition.valueVariable.getType(), call.getKind()), right, predicate);
+    }
+
+    private Method getMethod(Type comparisonReturnType, SqlKind kind) {
+      switch (kind) {
+      case SOME:
+        return Primitive.is(comparisonReturnType)
+            ? BuiltInMethod.COLLECTION_EXISTS.method
+            // if the array contains any null elements and no true comparison result is obtained,
+            // the result of SOME will be null, not false.
+            : BuiltInMethod.COLLECTION_NULLABLE_EXISTS.method;
+      case ALL:
+        return Primitive.is(comparisonReturnType)
+            ? BuiltInMethod.COLLECTION_ALL.method
+            // if the array contains any null elements and no false comparison result is obtained,
+            // the result of ALL will be null, not true.
+            : BuiltInMethod.COLLECTION_NULLABLE_ALL.method;
+      default:
+        throw new IllegalArgumentException("Unknown quantify operator" + kind + ". Only support SOME,ALL.");
+      }
+    }
+  }
+
 
   /** Implements the {@code SESSION} table function. */
   private static class SessionImplementor implements TableFunctionCallImplementor {

@@ -19,6 +19,8 @@ package org.apache.calcite.test;
 import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.linq4j.Linq4j;
+import org.apache.calcite.linq4j.function.Function1;
+import org.apache.calcite.linq4j.function.Function2;
 import org.apache.calcite.plan.Strong;
 import org.apache.calcite.rel.type.DelegatingTypeSystem;
 import org.apache.calcite.rel.type.RelDataType;
@@ -104,6 +106,7 @@ import java.util.regex.Pattern;
 import static org.apache.calcite.linq4j.tree.Expressions.list;
 import static org.apache.calcite.rel.type.RelDataTypeImpl.NON_NULLABLE_SUFFIX;
 import static org.apache.calcite.sql.fun.SqlStdOperatorTable.PI;
+import static org.apache.calcite.sql.fun.SqlStdOperatorTable.QUANTIFY_OPERATORS;
 import static org.apache.calcite.sql.test.ResultCheckers.isExactly;
 import static org.apache.calcite.sql.test.ResultCheckers.isNullValue;
 import static org.apache.calcite.sql.test.ResultCheckers.isSet;
@@ -130,27 +133,22 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * Contains unit tests for all operators. Each of the methods is named after an
  * operator.
- *
  * <p>To run, you also need an execution mechanism: parse, validate, and execute
  * expressions on the operators. This is left to a {@link SqlTester} object
  * which is obtained via the {@link #fixture()} method. The default tester
  * merely validates calls to operators, but {@code CalciteSqlOperatorTest}
  * uses a tester that executes calls and checks that results are valid.
- *
  * <p>Different implementations of {@link SqlTester} are possible, such as:
- *
  * <ul>
  * <li>Execute against a JDBC database;
  * <li>Parse and validate but do not evaluate expressions;
  * <li>Generate a SQL script;
  * <li>Analyze which operators are adequately tested.
  * </ul>
- *
  * <p>A typical method will be named after the operator it is testing (say
  * <code>testSubstringFunc</code>). It first calls
  * {@link SqlOperatorFixture#setFor(SqlOperator, VmName...)}
  * to declare which operator it is testing.
- *
  * <blockquote>
  * <pre><code>
  * public void testSubstringFunc() {
@@ -159,15 +157,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *     tester.checkScalar("sin(1.5707)", "1");
  * }</code></pre>
  * </blockquote>
- *
  * <p>The rest of the method contains calls to the various {@code checkXxx}
  * methods in the {@link SqlTester} interface. For an operator
  * to be adequately tested, there need to be tests for:
- *
  * <ul>
  * <li>Parsing all of its the syntactic variants.
  * <li>Deriving the type of in all combinations of arguments.
- *
  * <ul>
  * <li>Pay particular attention to nullability. For example, the result of the
  * "+" operator is NOT NULL if and only if both of its arguments are NOT
@@ -235,8 +230,10 @@ public class SqlOperatorTest {
   public static final List<String> YEAR_VARIANTS =
       Arrays.asList("YEAR", "SQL_TSI_YEAR");
 
-  /** Minimum and maximum values for each exact and approximate numeric
-   * type. */
+  /**
+   * Minimum and maximum values for each exact and approximate numeric
+   * type.
+   */
   enum Numeric {
     TINYINT("TINYINT", Long.toString(Byte.MIN_VALUE),
         Long.toString(Byte.MIN_VALUE - 1),
@@ -268,16 +265,20 @@ public class SqlOperatorTest {
 
     private final String typeName;
 
-    /** For Float and Double Java types, MIN_VALUE
+    /**
+     * For Float and Double Java types, MIN_VALUE
      * is the smallest positive value, not the smallest negative value.
      * For REAL, FLOAT, DOUBLE, Win32 takes smaller values from
-     * win32_values.h. */
+     * win32_values.h.
+     */
     private final String minNumericString;
     private final String minOverflowNumericString;
 
-    /** For REAL, FLOAT and DOUBLE SQL types (Flaot and Double Java types), we
+    /**
+     * For REAL, FLOAT and DOUBLE SQL types (Flaot and Double Java types), we
      * use something slightly less than MAX_VALUE because round-tripping string
-     * to approx to string doesn't preserve MAX_VALUE on win32. */
+     * to approx to string doesn't preserve MAX_VALUE on win32.
+     */
     private final String maxNumericString;
     private final String maxOverflowNumericString;
 
@@ -291,8 +292,10 @@ public class SqlOperatorTest {
       this.maxOverflowNumericString = maxOverflowNumericString;
     }
 
-    /** Calls a consumer for each value. Similar effect to a {@code for}
-     * loop, but the calling line number will show up in the call stack. */
+    /**
+     * Calls a consumer for each value. Similar effect to a {@code for}
+     * loop, but the calling line number will show up in the call stack.
+     */
     static void forEach(Consumer<Numeric> consumer) {
       consumer.accept(TINYINT);
       consumer.accept(SMALLINT);
@@ -335,8 +338,10 @@ public class SqlOperatorTest {
    */
   public static final boolean DECIMAL = false;
 
-  /** Function object that returns a string with 2 copies of each character.
-   * For example, {@code DOUBLER.apply("xy")} returns {@code "xxyy"}. */
+  /**
+   * Function object that returns a string with 2 copies of each character.
+   * For example, {@code DOUBLER.apply("xy")} returns {@code "xxyy"}.
+   */
   private static final UnaryOperator<String> DOUBLER =
       new UnaryOperator<String>() {
         final Pattern pattern = Pattern.compile("(.)");
@@ -1015,9 +1020,11 @@ public class SqlOperatorTest {
     f.checkNull("cast(null as boolean)");
   }
 
-  /** Test case for
+  /**
+   * Test case for
    * <a href="https://issues.apache.org/jira/browse/CALCITE-1439">[CALCITE-1439]
-   * Handling errors during constant reduction</a>. */
+   * Handling errors during constant reduction</a>.
+   */
   @Test void testCastInvalid() {
     // Before CALCITE-1439 was fixed, constant reduction would kick in and
     // generate Java constants that throw when the class is loaded, thus
@@ -1212,7 +1219,6 @@ public class SqlOperatorTest {
   /**
    * Returns a Calendar that is the current time, pausing if we are within 2
    * minutes of midnight or the top of the hour.
-   *
    * @param timeUnit Time unit
    * @return calendar
    */
@@ -1268,7 +1274,8 @@ public class SqlOperatorTest {
         INVALID_CHAR_MESSAGE, true);
   }
 
-  /** Test case for
+  /**
+   * Test case for
    * <a href="https://issues.apache.org/jira/browse/CALCITE-4861">[CALCITE-4861]
    * Optimisation of chained cast calls can lead to unexpected behaviour.</a>.
    */
@@ -1321,8 +1328,8 @@ public class SqlOperatorTest {
     // so nulls do not match.
     // (Unlike Oracle's 'decode(null, null, ...)', by the way.)
     f.checkString("case cast(null as int)\n"
-        + "when cast(null as int) then 'nulls match'\n"
-        + "else 'nulls do not match' end",
+            + "when cast(null as int) then 'nulls match'\n"
+            + "else 'nulls do not match' end",
         "nulls do not match",
         "CHAR(18) NOT NULL");
 
@@ -1460,7 +1467,6 @@ public class SqlOperatorTest {
 
   /**
    * Tests support for JDBC functions.
-   *
    * <p>See FRG-97 "Support for JDBC escape syntax is incomplete".
    */
   @Test void testJdbcFn() {
@@ -2232,14 +2238,15 @@ public class SqlOperatorTest {
         + " interval '1 2:3:4.5' day to second)");
   }
 
-  /** Test case for
+  /**
+   * Test case for
    * <a href="https://issues.apache.org/jira/browse/CALCITE-715">[CALCITE-715]
    * Add PERIOD type constructor and period operators (CONTAINS, PRECEDES,
    * etc.)</a>.
-   *
    * <p>Tests OVERLAP and similar period operators CONTAINS, EQUALS, PRECEDES,
    * SUCCEEDS, IMMEDIATELY PRECEDES, IMMEDIATELY SUCCEEDS for DATE, TIME and
-   * TIMESTAMP values. */
+   * TIMESTAMP values.
+   */
   @Test void testPeriodOperators() {
     String[] times = {
         "TIME '01:00:00'",
@@ -2669,9 +2676,11 @@ public class SqlOperatorTest {
         "2014-04-12", "DATE NOT NULL");
   }
 
-  /** Test case for
+  /**
+   * Test case for
    * <a href="https://issues.apache.org/jira/browse/CALCITE-1864">[CALCITE-1864]
-   * Allow NULL literal as argument</a>. */
+   * Allow NULL literal as argument</a>.
+   */
   @Test void testNullOperand() {
     final SqlOperatorFixture f = fixture();
     checkNullOperand(f, "=");
@@ -3262,9 +3271,11 @@ public class SqlOperatorTest {
     f1.checkBoolean("'ab\ncd\nef' ilike '%cde%'", false);
   }
 
-  /** Test case for
+  /**
+   * Test case for
    * <a href="https://issues.apache.org/jira/browse/CALCITE-1898">[CALCITE-1898]
-   * LIKE must match '.' (period) literally</a>. */
+   * LIKE must match '.' (period) literally</a>.
+   */
   @Test void testLikeDot() {
     final SqlOperatorFixture f = fixture();
     f.checkBoolean("'abc' like 'a.c'", false);
@@ -3439,8 +3450,8 @@ public class SqlOperatorTest {
     final String expectedError =
         TestUtil.getJavaMajorVersion() >= 13
             ? "Illegal repetition near index 22\n"
-              + "\\[\\:LOWER\\:\\]\\{2\\}\\[\\:DIGIT\\:\\]\\{,5\\}\n"
-              + "                      \\^"
+            + "\\[\\:LOWER\\:\\]\\{2\\}\\[\\:DIGIT\\:\\]\\{,5\\}\n"
+            + "                      \\^"
             : "Illegal repetition near index 20\n"
                 + "\\[\\:LOWER\\:\\]\\{2\\}\\[\\:DIGIT\\:\\]\\{,5\\}\n"
                 + "                    \\^";
@@ -4889,7 +4900,7 @@ public class SqlOperatorTest {
             "Cannot apply 'INITCAP' to arguments of type "
                 + "'INITCAP\\(<DATE>\\)'\\. Supported form\\(s\\): "
                 + "'INITCAP\\(<CHARACTER>\\)'",
-        false);
+            false);
     f.checkType("initcap(cast(null as date))", "VARCHAR");
   }
 
@@ -5150,7 +5161,7 @@ public class SqlOperatorTest {
             "Cannot apply 'ACOS' to arguments of type "
                 + "'ACOS\\(<CHAR\\(3\\)>\\)'\\. Supported form\\(s\\): "
                 + "'ACOS\\(<NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("acos('abc')", "DOUBLE NOT NULL");
     f.checkScalarApprox("acos(0.5)", "DOUBLE NOT NULL",
         isWithin(1.0472d, 0.0001d));
@@ -5171,7 +5182,7 @@ public class SqlOperatorTest {
             "Cannot apply 'ASIN' to arguments of type "
                 + "'ASIN\\(<CHAR\\(3\\)>\\)'\\. Supported form\\(s\\): "
                 + "'ASIN\\(<NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("asin('abc')", "DOUBLE NOT NULL");
     f.checkScalarApprox("asin(0.5)", "DOUBLE NOT NULL",
         isWithin(0.5236d, 0.0001d));
@@ -5192,7 +5203,7 @@ public class SqlOperatorTest {
             "Cannot apply 'ATAN' to arguments of type "
                 + "'ATAN\\(<CHAR\\(3\\)>\\)'\\. Supported form\\(s\\): "
                 + "'ATAN\\(<NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("atan('abc')", "DOUBLE NOT NULL");
     f.checkScalarApprox("atan(2)", "DOUBLE NOT NULL",
         isWithin(1.1071d, 0.0001d));
@@ -5215,7 +5226,7 @@ public class SqlOperatorTest {
             "Cannot apply 'ATAN2' to arguments of type "
                 + "'ATAN2\\(<CHAR\\(3\\)>, <CHAR\\(3\\)>\\)'\\. "
                 + "Supported form\\(s\\): 'ATAN2\\(<NUMERIC>, <NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("atan2('abc', 'def')", "DOUBLE NOT NULL");
     f.checkScalarApprox("atan2(0.5, -0.5)", "DOUBLE NOT NULL",
         isWithin(2.3562d, 0.0001d));
@@ -5237,7 +5248,7 @@ public class SqlOperatorTest {
             "Cannot apply 'CBRT' to arguments of type "
                 + "'CBRT\\(<CHAR\\(3\\)>\\)'\\. Supported form\\(s\\): "
                 + "'CBRT\\(<NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("cbrt('abc')", "DOUBLE NOT NULL");
     f.checkScalar("cbrt(8)", "2.0", "DOUBLE NOT NULL");
     f.checkScalar("cbrt(-8)", "-2.0", "DOUBLE NOT NULL");
@@ -5258,7 +5269,7 @@ public class SqlOperatorTest {
             "Cannot apply 'COS' to arguments of type "
                 + "'COS\\(<CHAR\\(3\\)>\\)'\\. Supported form\\(s\\): "
                 + "'COS\\(<NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("cos('abc')", "DOUBLE NOT NULL");
     f.checkScalarApprox("cos(1)", "DOUBLE NOT NULL",
         isWithin(0.5403d, 0.0001d));
@@ -5319,7 +5330,7 @@ public class SqlOperatorTest {
             "Cannot apply 'DEGREES' to arguments of type "
                 + "'DEGREES\\(<CHAR\\(3\\)>\\)'\\. Supported form\\(s\\): "
                 + "'DEGREES\\(<NUMERIC>\\)'",
-        false);
+            false);
     f.checkType("degrees('abc')", "DOUBLE NOT NULL");
     f.checkScalarApprox("degrees(1)", "DOUBLE NOT NULL",
         isWithin(57.2958d, 0.0001d));
@@ -5801,17 +5812,16 @@ public class SqlOperatorTest {
 
   /**
    * Returns a time string, in GMT, that will be valid for at least 2 minutes.
-   *
    * <p>For example, at "2005-01-01 12:34:56 PST", returns "2005-01-01 20:".
    * At "2005-01-01 12:34:59 PST", waits a minute, then returns "2005-01-01
    * 21:".
-   *
    * @param tz Time zone
    * @return Time string
    */
   protected static Pair<String, Hook.Closeable> currentTimeString(TimeZone tz) {
     final Calendar calendar = getCalendarNotTooNear(Calendar.HOUR_OF_DAY);
-    final Hook.Closeable closeable = () -> { };
+    final Hook.Closeable closeable = () -> {
+    };
     return Pair.of(toTimeString(tz, calendar), closeable);
   }
 
@@ -6066,9 +6076,11 @@ public class SqlOperatorTest {
     f.checkBoolean("ends_with(x'', x'')", true);
   }
 
-  /** Tests the {@code SUBSTRING} operator. Many test cases that used to be
+  /**
+   * Tests the {@code SUBSTRING} operator. Many test cases that used to be
    * have been moved to {@link SubFunChecker#assertSubFunReturns}, and are
-   * called for both {@code SUBSTRING} and {@code SUBSTR}. */
+   * called for both {@code SUBSTRING} and {@code SUBSTR}.
+   */
   @Test void testSubstringFunction() {
     final SqlOperatorFixture f = fixture();
     checkSubstringFunction(f);
@@ -6110,43 +6122,55 @@ public class SqlOperatorTest {
     f.checkNull("substring('abc' FROM 2 FOR cast(null as integer))");
   }
 
-  /** Tests the non-standard SUBSTR function, that has syntax
-   * "SUBSTR(value, start [, length ])", as used in BigQuery. */
+  /**
+   * Tests the non-standard SUBSTR function, that has syntax
+   * "SUBSTR(value, start [, length ])", as used in BigQuery.
+   */
   @Test void testBigQuerySubstrFunction() {
     substrChecker(SqlLibrary.BIG_QUERY, SqlLibraryOperators.SUBSTR_BIG_QUERY)
         .check();
   }
 
-  /** Tests the non-standard SUBSTR function, that has syntax
-   * "SUBSTR(value, start [, length ])", as used in Oracle. */
+  /**
+   * Tests the non-standard SUBSTR function, that has syntax
+   * "SUBSTR(value, start [, length ])", as used in Oracle.
+   */
   @Test void testMysqlSubstrFunction() {
     substrChecker(SqlLibrary.MYSQL, SqlLibraryOperators.SUBSTR_MYSQL)
         .check();
   }
 
-  /** Tests the non-standard SUBSTR function, that has syntax
-   * "SUBSTR(value, start [, length ])", as used in Oracle. */
+  /**
+   * Tests the non-standard SUBSTR function, that has syntax
+   * "SUBSTR(value, start [, length ])", as used in Oracle.
+   */
   @Test void testOracleSubstrFunction() {
     substrChecker(SqlLibrary.ORACLE, SqlLibraryOperators.SUBSTR_ORACLE)
         .check();
   }
 
-  /** Tests the non-standard SUBSTR function, that has syntax
-   * "SUBSTR(value, start [, length ])", as used in PostgreSQL. */
+  /**
+   * Tests the non-standard SUBSTR function, that has syntax
+   * "SUBSTR(value, start [, length ])", as used in PostgreSQL.
+   */
   @Test void testPostgresqlSubstrFunction() {
     substrChecker(SqlLibrary.POSTGRESQL, SqlLibraryOperators.SUBSTR_POSTGRESQL)
         .check();
   }
 
-  /** Tests the standard {@code SUBSTRING} function in the mode that has
-   * BigQuery's non-standard semantics. */
+  /**
+   * Tests the standard {@code SUBSTRING} function in the mode that has
+   * BigQuery's non-standard semantics.
+   */
   @Test void testBigQuerySubstringFunction() {
     substringChecker(SqlConformanceEnum.BIG_QUERY, SqlLibrary.BIG_QUERY)
         .check();
   }
 
-  /** Tests the standard {@code SUBSTRING} function in ISO standard
-   * semantics. */
+  /**
+   * Tests the standard {@code SUBSTRING} function in ISO standard
+   * semantics.
+   */
   @Test void testStandardSubstringFunction() {
     substringChecker(SqlConformanceEnum.STRICT_2003, SqlLibrary.POSTGRESQL)
         .check();
@@ -6167,8 +6191,10 @@ public class SqlOperatorTest {
     return new SubFunChecker(fixture().withLibrary(library), library, function);
   }
 
-  /** Tests various configurations of {@code SUBSTR} and {@code SUBSTRING}
-   * functions. */
+  /**
+   * Tests various configurations of {@code SUBSTR} and {@code SUBSTRING}
+   * functions.
+   */
   static class SubFunChecker {
     final SqlOperatorFixture f;
     final SqlLibrary library;
@@ -6486,8 +6512,10 @@ public class SqlOperatorTest {
     f12.checkNull("nvl(CAST(NULL AS VARCHAR(6)), cast(NULL AS VARCHAR(4)))");
   }
 
-  /** Tests {@code IFNULL}, which is a synonym for {@code NVL}, and is related to
-   * {@code COALESCE} but requires precisely two arguments. */
+  /**
+   * Tests {@code IFNULL}, which is a synonym for {@code NVL}, and is related to
+   * {@code COALESCE} but requires precisely two arguments.
+   */
   @Test void testIfnullFunc() {
     final SqlOperatorFixture f = fixture()
         .withLibrary(SqlLibrary.BIG_QUERY)
@@ -6532,7 +6560,7 @@ public class SqlOperatorTest {
         "CHAR(1) NOT NULL");
     // nulls match
     f.checkScalar("decode(cast(null as integer), 0, 'a',\n"
-        + " cast(null as integer), 'b', 2, 'c', 'd')", "b",
+            + " cast(null as integer), 'b', 2, 'c', 'd')", "b",
         "CHAR(1) NOT NULL");
   }
 
@@ -6573,7 +6601,7 @@ public class SqlOperatorTest {
     f.checkBoolean("1 member of multiset[1]", true);
     f.checkBoolean("'2' member of multiset['1']", false);
     f.checkBoolean("cast(null as double) member of"
-            + " multiset[cast(null as double)]", true);
+        + " multiset[cast(null as double)]", true);
     f.checkBoolean("cast(null as double) member of multiset[1.1]", false);
     f.checkBoolean("1.1 member of multiset[cast(null as double)]", false);
   }
@@ -6583,7 +6611,7 @@ public class SqlOperatorTest {
     f.setFor(SqlStdOperatorTable.MULTISET_UNION_DISTINCT,
         VM_FENNEL, VM_JAVA);
     f.checkBoolean("multiset[1,2] submultiset of "
-            + "(multiset[2] multiset union multiset[1])", true);
+        + "(multiset[2] multiset union multiset[1])", true);
     f.checkScalar("cardinality(multiset[1, 2, 3, 4, 2] "
             + "multiset union distinct multiset[1, 4, 5, 7, 8])",
         "7",
@@ -6690,7 +6718,7 @@ public class SqlOperatorTest {
     f.checkBoolean("multiset['a', 'b'] not submultiset of "
         + "multiset['c', 'd', 's', 'a']", true);
     f.checkBoolean("multiset['a', 'd'] not submultiset of "
-            + "multiset['c', 's', 'a', 'w', 'd']", false);
+        + "multiset['c', 's', 'a', 'w', 'd']", false);
     f.checkBoolean("multiset['q', 'a'] not submultiset of "
         + "multiset['a', 'q']", false);
   }
@@ -6729,11 +6757,11 @@ public class SqlOperatorTest {
     f.checkAggType("listagg(12)", "VARCHAR NOT NULL");
     f.enableTypeCoercion(false)
         .checkFails("^listagg(12)^",
-        "Cannot apply 'LISTAGG' to arguments of type .*'\n.*'", false);
+            "Cannot apply 'LISTAGG' to arguments of type .*'\n.*'", false);
     f.checkAggType("listagg(cast(12 as double))", "VARCHAR NOT NULL");
     f.enableTypeCoercion(false)
         .checkFails("^listagg(cast(12 as double))^",
-        "Cannot apply 'LISTAGG' to arguments of type .*'\n.*'", false);
+            "Cannot apply 'LISTAGG' to arguments of type .*'\n.*'", false);
     f.checkFails("^listagg()^",
         "Invalid number of arguments to function 'LISTAGG'. Was expecting 1 arguments",
         false);
@@ -6923,8 +6951,10 @@ public class SqlOperatorTest {
         "INTEGER NOT NULL MULTISET NOT NULL");
     f.enableTypeCoercion(false).checkFails("^intersection(12)^",
         "Cannot apply 'INTERSECTION' to arguments of type .*", false);
-    final String[] values1 = {"MULTISET[0]", "MULTISET[1]", "MULTISET[2]",
-        "MULTISET[3]"};
+    final String[] values1 = {
+        "MULTISET[0]", "MULTISET[1]", "MULTISET[2]",
+        "MULTISET[3]"
+    };
     f.checkAgg("intersection(x)", values1, isSingle("[]"));
     final String[] values2 = {"MULTISET[0, 1]", "MULTISET[1, 2]"};
     f.checkAgg("intersection(x)", values2, isSingle("[1]"));
@@ -6955,7 +6985,7 @@ public class SqlOperatorTest {
     f.checkAggType("mode(DISTINCT 1.5)", "DECIMAL(2, 1) NOT NULL");
     f.checkType("mode(cast(null as varchar(2)))", "VARCHAR(2)");
 
-    final String[] values = {"0", "CAST(null AS INTEGER)", "2", "2", "3", "3", "3" };
+    final String[] values = {"0", "CAST(null AS INTEGER)", "2", "2", "3", "3", "3"};
     f.checkAgg("mode(x)", values, isSingle("3"));
     final String[] values2 = {"0", null, null, null, "2", "2"};
     f.checkAgg("mode(x)", values2, isSingle("2"));
@@ -7097,13 +7127,13 @@ public class SqlOperatorTest {
           "0", "BIGINT NOT NULL");
 
       f.checkScalar("extract(millisecond from "
-              + "interval '4-2' year to month)", "0", "BIGINT NOT NULL");
+          + "interval '4-2' year to month)", "0", "BIGINT NOT NULL");
 
       f.checkScalar("extract(microsecond "
-              + "from interval '4-2' year to month)", "0", "BIGINT NOT NULL");
+          + "from interval '4-2' year to month)", "0", "BIGINT NOT NULL");
 
       f.checkScalar("extract(nanosecond from "
-              + "interval '4-2' year to month)", "0", "BIGINT NOT NULL");
+          + "interval '4-2' year to month)", "0", "BIGINT NOT NULL");
 
       f.checkScalar("extract(minute from interval '4-2' year to month)",
           "0", "BIGINT NOT NULL");
@@ -7558,7 +7588,7 @@ public class SqlOperatorTest {
             + "from (VALUES (ROW(ROW(3, CAST(NULL AS INTEGER)), ROW(4, 8)))) as T(x, y)",
         SqlTests.ANY_TYPE_CHECKER, isNullValue());
     f.checkFails("select \"T\".\"X\"[1 + CAST(NULL AS INTEGER)] "
-        + "from (VALUES (ROW(ROW(3, CAST(NULL AS INTEGER)), ROW(4, 8)))) as T(x, y)",
+            + "from (VALUES (ROW(ROW(3, CAST(NULL AS INTEGER)), ROW(4, 8)))) as T(x, y)",
         "Cannot infer type of field at position null within ROW type: "
             + "RecordType\\(INTEGER EXPR\\$0, INTEGER EXPR\\$1\\)", false);
   }
@@ -7679,7 +7709,7 @@ public class SqlOperatorTest {
                 + "'CEIL\\(<DATE> TO <TIME_UNIT>\\)'\n"
                 + "'CEIL\\(<TIME> TO <TIME_UNIT>\\)'\n"
                 + "'CEIL\\(<TIMESTAMP> TO <TIME_UNIT>\\)'",
-        false);
+            false);
     f.checkType("ceil('12:34:56')", "DECIMAL(19, 0) NOT NULL");
     f.checkFails("^ceil(time '12:34:56')^",
         "(?s)Cannot apply 'CEIL' to arguments .*", false);
@@ -7722,8 +7752,10 @@ public class SqlOperatorTest {
     f.checkNull("ceiling(cast(null as timestamp) to month)");
   }
 
-  /** Tests {@code FLOOR}, {@code CEIL}, {@code TIMESTAMPADD},
-   * {@code TIMESTAMPDIFF} functions with custom time frames. */
+  /**
+   * Tests {@code FLOOR}, {@code CEIL}, {@code TIMESTAMPADD},
+   * {@code TIMESTAMPDIFF} functions with custom time frames.
+   */
   @Test void testCustomTimeFrame() {
     final SqlOperatorFixture f = fixture()
         .withFactory(tf ->
@@ -7793,7 +7825,7 @@ public class SqlOperatorTest {
     f.withLibrary(SqlLibrary.BIG_QUERY)
         .setFor(SqlLibraryOperators.TIMESTAMP_DIFF3)
         .checkScalar("timestamp_diff(timestamp '2008-12-25 15:30:00', "
-            + "timestamp '2008-12-25 16:30:00', \"minute15\")",
+                + "timestamp '2008-12-25 16:30:00', \"minute15\")",
             "-4", "INTEGER NOT NULL");
   }
 
@@ -7986,8 +8018,10 @@ public class SqlOperatorTest {
         "TIMESTAMP(3) NOT NULL");
   }
 
-  /** Tests {@code TIMESTAMP_ADD}, BigQuery's 2-argument variant of the
-   * 3-argument {@code TIMESTAMPADD} function. */
+  /**
+   * Tests {@code TIMESTAMP_ADD}, BigQuery's 2-argument variant of the
+   * 3-argument {@code TIMESTAMPADD} function.
+   */
   @Test void testTimestampAdd2() {
     final SqlOperatorFixture f0 = fixture()
         .setFor(SqlLibraryOperators.TIMESTAMP_ADD2);
@@ -8029,12 +8063,14 @@ public class SqlOperatorTest {
     f.checkNull("timestamp_add(CAST(NULL AS TIMESTAMP), interval 5 minute)");
   }
 
-  /** Tests BigQuery's {@code DATETIME_ADD(timestamp, interval)} function.
+  /**
+   * Tests BigQuery's {@code DATETIME_ADD(timestamp, interval)} function.
    * When Calcite runs in BigQuery mode, {@code DATETIME} is a type alias for
    * {@code TIMESTAMP} and this function follows the same behavior as
    * {@code TIMESTAMP_ADD(timestamp, interval)}. The tests below use
    * {@code TIMESTAMP} values rather than the {@code DATETIME} alias because the
-   * operator fixture does not currently support type aliases. */
+   * operator fixture does not currently support type aliases.
+   */
   @Test void testDatetimeAdd() {
     final SqlOperatorFixture f0 = fixture()
         .setFor(SqlLibraryOperators.DATETIME_ADD);
@@ -8076,11 +8112,13 @@ public class SqlOperatorTest {
     f.checkNull("datetime_add(CAST(NULL AS TIMESTAMP), interval 5 minute)");
   }
 
-  /** Tests {@code TIMESTAMP_DIFF}, BigQuery's variant of the
+  /**
+   * Tests {@code TIMESTAMP_DIFF}, BigQuery's variant of the
    * {@code TIMESTAMPDIFF} function, which differs in the ordering
    * of the parameters and the ordering of the subtraction between
    * the two timestamps. In {@code TIMESTAMPDIFF} it is (t2 - t1)
-   * while for {@code TIMESTAMP_DIFF} is is (t1 - t2). */
+   * while for {@code TIMESTAMP_DIFF} is is (t1 - t2).
+   */
   @Test void testTimestampDiff3() {
     final SqlOperatorFixture f0 = fixture()
         .setFor(SqlLibraryOperators.TIMESTAMP_DIFF3);
@@ -8191,12 +8229,14 @@ public class SqlOperatorTest {
             isNullValue(), "INTEGER"));
   }
 
-  /** Tests BigQuery's {@code DATETIME_DIFF(timestamp, timestamp2, timeUnit)}
+  /**
+   * Tests BigQuery's {@code DATETIME_DIFF(timestamp, timestamp2, timeUnit)}
    * function. When Calcite runs in BigQuery mode, {@code DATETIME} is a type
    * alias for {@code TIMESTAMP} and this function follows the same behavior as
    * {@code TIMESTAMP_DIFF(timestamp, timestamp2, timeUnit)}. The tests below
    * use {@code TIMESTAMP} values rather than the {@code DATETIME} alias because
-   * the operator fixture does not currently support type aliases. */
+   * the operator fixture does not currently support type aliases.
+   */
   @Test void testDatetimeDiff() {
     final SqlOperatorFixture f0 = fixture()
         .setFor(SqlLibraryOperators.DATETIME_DIFF);
@@ -8557,10 +8597,12 @@ public class SqlOperatorTest {
     f.checkNull("date_sub(CAST(NULL AS DATE), interval 5 day)");
   }
 
-  /** Tests for BigQuery's DATETIME_SUB() function. Because the operator
+  /**
+   * Tests for BigQuery's DATETIME_SUB() function. Because the operator
    * fixture does not currently support type aliases, TIMESTAMPs are used
    * in place of DATETIMEs (a Calcite alias of TIMESTAMP) for the function's
-   * first argument. */
+   * first argument.
+   */
   @Test void testDatetimeSub() {
     final SqlOperatorFixture f0 = fixture()
         .setFor(SqlLibraryOperators.DATETIME_SUB);
@@ -8602,8 +8644,10 @@ public class SqlOperatorTest {
     f.checkNull("datetime_sub(CAST(NULL AS TIMESTAMP), interval 5 minute)");
   }
 
-  /** The {@code DATEDIFF} function is implemented in the Babel parser but not
-   * the Core parser, and therefore gives validation errors. */
+  /**
+   * The {@code DATEDIFF} function is implemented in the Babel parser but not
+   * the Core parser, and therefore gives validation errors.
+   */
   @Test void testDateDiff() {
     final SqlOperatorFixture f = fixture()
         .setFor(SqlLibraryOperators.DATEDIFF);
@@ -8612,8 +8656,10 @@ public class SqlOperatorTest {
         false);
   }
 
-  /** Tests BigQuery's {@code TIME_ADD}, which adds an interval to a time
-   * expression. */
+  /**
+   * Tests BigQuery's {@code TIME_ADD}, which adds an interval to a time
+   * expression.
+   */
   @Test void testTimeAdd() {
     final SqlOperatorFixture f0 = fixture()
         .setFor(SqlLibraryOperators.TIME_ADD);
@@ -9035,7 +9081,7 @@ public class SqlOperatorTest {
             "(?s)Cannot apply 'SUM' to arguments of type "
                 + "'SUM\\(<CHAR\\(4\\)>\\)'\\. Supported form\\(s\\): "
                 + "'SUM\\(<NUMERIC>\\)'.*",
-        false);
+            false);
     f.checkType("sum('name')", "DECIMAL(19, 9)");
     f.checkAggType("sum(1)", "INTEGER NOT NULL");
     f.checkAggType("sum(1.2)", "DECIMAL(19, 1) NOT NULL");
@@ -9051,7 +9097,7 @@ public class SqlOperatorTest {
             "(?s)Cannot apply 'SUM' to arguments of type "
                 + "'SUM\\(<VARCHAR\\(2\\)>\\)'\\. Supported form\\(s\\): "
                 + "'SUM\\(<NUMERIC>\\)'.*",
-        false);
+            false);
     f.checkType("sum(cast(null as varchar(2)))", "DECIMAL(19, 9)");
     final String[] values = {"0", "CAST(null AS INTEGER)", "2", "2"};
     f.checkAgg("sum(x)", values, isSingle(4));
@@ -9261,7 +9307,7 @@ public class SqlOperatorTest {
             "(?s)Cannot apply 'STDDEV' to arguments of type "
                 + "'STDDEV\\(<VARCHAR\\(2\\)>\\)'\\. "
                 + "Supported form\\(s\\): 'STDDEV\\(<NUMERIC>\\)'.*",
-        false);
+            false);
     f.checkType("stddev(cast(null as varchar(2)))", "DECIMAL(19, 9)");
     f.checkType("stddev(CAST(NULL AS INTEGER))", "INTEGER");
     f.checkAggType("stddev(DISTINCT 1.5)", "DECIMAL(2, 1) NOT NULL");
@@ -9471,7 +9517,99 @@ public class SqlOperatorTest {
     f.checkAgg("some(x = 2)", values, isSingle("true"));
   }
 
+  /** Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-5160">[CALCITE-5160]
+   * ANY/SOME, ALL operators should support collection expressions</a>. */
+  @Test void testQuantifyCollectionOperators() {
+    final SqlOperatorFixture f = fixture();
+    QUANTIFY_OPERATORS.forEach(operator -> f.setFor(operator, SqlOperatorFixture.VmName.EXPAND));
 
+    Function2<String, Boolean, Void> checkBoolean = (sql, result) -> {
+      f.checkBoolean(sql.replace("COLLECTION", "ARRAY"), result);
+      f.checkBoolean(sql.replace("COLLECTION", "MULTISET"), result);
+      return null;
+    };
+
+    Function1<String, Void> checkNull = sql -> {
+      f.checkNull(sql.replace("COLLECTION", "ARRAY"));
+      f.checkNull(sql.replace("COLLECTION", "MULTISET"));
+      return null;
+    };
+
+    checkNull.apply("1 = some (COLLECTION[2,3,null])");
+    checkNull.apply("null = some (COLLECTION[1,2,3])");
+    checkNull.apply("null = some (COLLECTION[1,2,null])");
+    checkNull.apply("1 = some (COLLECTION[null,null,null])");
+    checkNull.apply("null = some (COLLECTION[null,null,null])");
+
+    checkBoolean.apply("1 = some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("3 = some (COLLECTION[1,2])", false);
+
+    checkBoolean.apply("1 <> some (COLLECTION[1])", false);
+    checkBoolean.apply("2 <> some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("3 <> some (COLLECTION[1,2,null])", true);
+
+    checkBoolean.apply("1 < some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("0 < some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("2 < some (COLLECTION[1,2])", false);
+
+    checkBoolean.apply("2 <= some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("0 <= some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("3 <= some (COLLECTION[1,2])", false);
+
+    checkBoolean.apply("2 > some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("3 > some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("1 > some (COLLECTION[1,2])", false);
+
+    checkBoolean.apply("2 >= some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("3 >= some (COLLECTION[1,2,null])", true);
+    checkBoolean.apply("0 >= some (COLLECTION[1,2])", false);
+
+    f.check("SELECT 3 = some(x.t) FROM (SELECT ARRAY[1,2,3,null] as t) as x",
+        "BOOLEAN", true);
+    f.check("SELECT 4 = some(x.t) FROM (SELECT ARRAY[1,2,3] as t) as x",
+        "BOOLEAN NOT NULL", false);
+    f.check("SELECT 4 = some(x.t) FROM (SELECT ARRAY[1,2,3,null] as t) as x",
+        "BOOLEAN", isNullValue());
+    f.check("SELECT (SELECT * FROM UNNEST(ARRAY[3]) LIMIT 1) = "
+            + "some(x.t) FROM (SELECT ARRAY[1,2,3,null] as t) as x",
+        "BOOLEAN", true);
+
+
+    checkNull.apply("1 = all (COLLECTION[1,1,null])");
+    checkNull.apply("null = all (COLLECTION[1,2,3])");
+    checkNull.apply("null = all (COLLECTION[1,2,null])");
+    checkNull.apply("1 = all (COLLECTION[null,null,null])");
+    checkNull.apply("null = all (COLLECTION[null,null,null])");
+
+    checkBoolean.apply("1 = all (COLLECTION[1,1])", true);
+    checkBoolean.apply("3 = all (COLLECTION[1,3,null])", false);
+
+    checkBoolean.apply("1 <> all (COLLECTION[2,3,4])", true);
+    checkBoolean.apply("2 <> all (COLLECTION[2,null])", false);
+
+    checkBoolean.apply("1 < all (COLLECTION[2,3,4])", true);
+    checkBoolean.apply("2 < all (COLLECTION[1,2,null])", false);
+
+    checkBoolean.apply("2 <= all (COLLECTION[2,3,4])", true);
+    checkBoolean.apply("1 <= all (COLLECTION[0,1,null])", false);
+
+    checkBoolean.apply("2 > all (COLLECTION[0,1])", true);
+    checkBoolean.apply("3 > all (COLLECTION[1,3,null])", false);
+
+    checkBoolean.apply("2 >= all (COLLECTION[0,1,2])", true);
+    checkBoolean.apply("3 >= all (COLLECTION[3,4,null])", false);
+
+    f.check("SELECT 3 >= all(x.t) FROM (SELECT ARRAY[1,2,3] as t) as x",
+        "BOOLEAN NOT NULL", true);
+    f.check("SELECT 4 = all(x.t) FROM (SELECT ARRAY[1,2,3,null] as t) as x",
+        "BOOLEAN", false);
+    f.check("SELECT 4 = all(x.t) FROM (SELECT ARRAY[4,4,null] as t) as x",
+        "BOOLEAN", isNullValue());
+    f.check("SELECT (SELECT * FROM UNNEST(ARRAY[3]) LIMIT 1) = "
+            + "all(x.t) FROM (SELECT ARRAY[3,3] as t) as x",
+        "BOOLEAN", true);
+  }
   @Test void testAnyValueFunc() {
     final SqlOperatorFixture f = fixture();
     f.setFor(SqlStdOperatorTable.ANY_VALUE, VM_EXPAND);
@@ -9664,15 +9802,16 @@ public class SqlOperatorTest {
         "CAST(x'03' AS BINARY)",
         "cast(x'02' as BINARY)",
         "cast(x'02' AS BINARY)",
-        "cast(null AS BINARY)"};
+        "cast(null AS BINARY)"
+    };
     f.checkAgg("bit_and(x)", binaryValues, isSingle("02"));
     f.checkAgg("bit_and(x)", new String[]{"CAST(x'02' AS BINARY)"}, isSingle("02"));
 
     f.checkAggFails("bit_and(x)",
         new String[]{"CAST(x'0201' AS VARBINARY)", "CAST(x'02' AS VARBINARY)"},
         "Error while executing SQL"
-            +  " \"SELECT bit_and\\(x\\)"
-            +  " FROM \\(SELECT CAST\\(x'0201' AS VARBINARY\\) AS x FROM \\(VALUES \\(1\\)\\)"
+            + " \"SELECT bit_and\\(x\\)"
+            + " FROM \\(SELECT CAST\\(x'0201' AS VARBINARY\\) AS x FROM \\(VALUES \\(1\\)\\)"
             + " UNION ALL SELECT CAST\\(x'02' AS VARBINARY\\) AS x FROM \\(VALUES \\(1\\)\\)\\)\":"
             + " Different length for bitwise operands: the first: 2, the second: 1",
         true);
@@ -9705,7 +9844,8 @@ public class SqlOperatorTest {
         "CAST(x'01' AS BINARY)",
         "cast(x'02' as BINARY)",
         "cast(x'02' AS BINARY)",
-        "cast(null AS BINARY)"};
+        "cast(null AS BINARY)"
+    };
     f.checkAgg("bit_or(x)", binaryValues, isSingle("03"));
     f.checkAgg("bit_or(x)", new String[]{"CAST(x'02' AS BINARY)"},
         isSingle("02"));
@@ -9738,7 +9878,8 @@ public class SqlOperatorTest {
         "CAST(x'01' AS BINARY)",
         "cast(x'02' as BINARY)",
         "cast(x'01' AS BINARY)",
-        "cast(null AS BINARY)"};
+        "cast(null AS BINARY)"
+    };
     f.checkAgg("bit_xor(x)", binaryValues, isSingle("02"));
     f.checkAgg("bit_xor(x)", new String[]{"CAST(x'02' AS BINARY)"},
         isSingle("02"));
@@ -9768,7 +9909,6 @@ public class SqlOperatorTest {
   /**
    * Tests that CAST fails when given a value just outside the valid range for
    * that type. For example,
-   *
    * <ul>
    * <li>CAST(-200 AS TINYINT) fails because the value is less than -128;
    * <li>CAST(1E-999 AS FLOAT) fails because the value underflows;
@@ -9812,7 +9952,6 @@ public class SqlOperatorTest {
   /**
    * Tests that CAST fails when given a value just outside the valid range for
    * that type. For example,
-   *
    * <ul>
    * <li>CAST(-200 AS TINYINT) fails because the value is less than -128;
    * <li>CAST(1E-999 AS FLOAT) fails because the value underflows;
@@ -9887,16 +10026,16 @@ public class SqlOperatorTest {
     f.checkBoolean("CAST(X'' AS BINARY(3)) = X''", false);
   }
 
-  /** Test that calls all operators with all possible argument types, and for
+  /**
+   * Test that calls all operators with all possible argument types, and for
    * each type, with a set of tricky values.
-   *
    * <p>This is not really a unit test since there are no assertions;
    * it either succeeds or fails in the preparation of the operator case
    * and not when actually testing (validating/executing) the call.
-   *
    * <p>Nevertheless the log messages conceal many problems which potentially
    * need to be fixed especially cases where the query passes from the
-   * validation stage and fails at runtime. */
+   * validation stage and fails at runtime.
+   */
   @Disabled("Too slow and not really a unit test")
   @Tag("slow")
   @Test void testArgumentBounds() {
@@ -9990,7 +10129,8 @@ public class SqlOperatorTest {
                 query = AbstractSqlTester.buildQuery(s);
               }
               f.check(query, SqlTests.ANY_TYPE_CHECKER,
-                  SqlTests.ANY_PARAMETER_CHECKER, result -> { });
+                  SqlTests.ANY_PARAMETER_CHECKER, result -> {
+                  });
             }
           } catch (Throwable e) {
             // Logging the top-level throwable directly makes the message
@@ -10037,7 +10177,6 @@ public class SqlOperatorTest {
    * Result checker that considers a test to have succeeded if it returns a
    * particular value or throws an exception that matches one of a list of
    * patterns.
-   *
    * <p>Sounds peculiar, but is necessary when eager and lazy behaviors are
    * both valid.
    */
@@ -10096,9 +10235,9 @@ public class SqlOperatorTest {
               .with(CalciteConnectionProperty.TYPE_SYSTEM,
                   CustomTimeFrameTypeSystem.class.getName());
       try (TryThreadLocal.Memo ignore =
-               CustomTimeFrameTypeSystem.DELEGATE.push(typeSystem);
-           Connection connection = connectionFactory.createConnection();
-           Statement statement = connection.createStatement()) {
+          CustomTimeFrameTypeSystem.DELEGATE.push(typeSystem);
+          Connection connection = connectionFactory.createConnection();
+          Statement statement = connection.createStatement()) {
         final ResultSet resultSet =
             statement.executeQuery(query);
         resultChecker.checkResult(resultSet);
@@ -10202,10 +10341,10 @@ public class SqlOperatorTest {
     }
   }
 
-  /** Type system whose constructor reads from a thread-local. You must invoke
+  /**
+   * Type system whose constructor reads from a thread-local. You must invoke
    * the constructor in the same thread, but once constructed you can use from
    * other threads.
-   *
    * <p>It's a bit strange, but the best we can do to pass objects via Avatica's
    * plugin system until
    * <a href="https://issues.apache.org/jira/browse/CALCITE-5295">[CALCITE-5295]
@@ -10213,14 +10352,18 @@ public class SqlOperatorTest {
    * ThreadLocal fields</a> is fixed.
    */
   public static class CustomTimeFrameTypeSystem extends DelegatingTypeSystem {
-    /** Assign to this thread-local before you instantiate a FooTypeSystem
+    /**
+     * Assign to this thread-local before you instantiate a FooTypeSystem
      * (in the same thread) and your FooTypeSystem will behave in the same
-     * way. */
+     * way.
+     */
     public static final TryThreadLocal<RelDataTypeSystem> DELEGATE =
         TryThreadLocal.of(DEFAULT);
 
-    /** Creates a CustomTimeFrameTypeSystem, taking a snapshot of
-     * {@link #DELEGATE}. */
+    /**
+     * Creates a CustomTimeFrameTypeSystem, taking a snapshot of
+     * {@link #DELEGATE}.
+     */
     public CustomTimeFrameTypeSystem() {
       super(DELEGATE.get());
     }
