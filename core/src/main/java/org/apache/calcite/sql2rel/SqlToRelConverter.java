@@ -4295,13 +4295,9 @@ public class SqlToRelConverter {
         joinList.add(lastList);
       }
       lastList = new ArrayList<>();
-      final SqlTypeName typeName =
-          requireNonNull(validator, "validator")
-              .getValidatedNodeType(call)
-              .getSqlTypeName();
       relBuilder.push(
           Collect.create(requireNonNull(input, "input"),
-              typeName, castNonNull(validator().deriveAlias(call, i))));
+              call.getKind(), castNonNull(validator().deriveAlias(call, i))));
       joinList.add(relBuilder.build());
     }
 

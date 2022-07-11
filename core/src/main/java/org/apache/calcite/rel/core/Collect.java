@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
@@ -130,6 +131,47 @@ public class Collect extends SingleRel {
     return create(input,
         deriveRowType(input.getCluster().getTypeFactory(), collectionType,
             fieldName, input.getRowType()));
+  }
+
+  /**
+   * Creates a Collect.
+   *
+   * @param input          Input relational expression
+   * @param sqlKind        SqlKind
+   * @param fieldName      Name of the sole output field
+   */
+  public static Collect create(RelNode input,
+      SqlKind sqlKind,
+      String fieldName) {
+    SqlTypeName collectionType;
+    switch (sqlKind) {
+    case ARRAY_QUERY_CONSTRUCTOR:
+    case ARRAY_VALUE_CONSTRUCTOR:
+      collectionType = SqlTypeName.ARRAY;
+      break;
+    case MULTISET_QUERY_CONSTRUCTOR:
+    case MULTISET_VALUE_CONSTRUCTOR:
+      collectionType = SqlTypeName.MULTISET;
+      break;
+    case MAP_QUERY_CONSTRUCTOR:
+    case MAP_VALUE_CONSTRUCTOR:
+      collectionType = SqlTypeName.MAP;
+      break;
+    default:
+      throw new IllegalArgumentException("not a collection kind "
+          + sqlKind);
+    }
+
+    switch (sqlKind) {
+    case ARRAY_QUERY_CONSTRUCTOR:
+    case MULTISET_QUERY_CONSTRUCTOR:
+      RelDataType rowType = deriveRowType(input.getCluster().getTypeFactory(),
+          collectionType, fieldName,
+          SqlTypeUtil.deriveCollectionQueryComponentType(collectionType, input.getRowType()));
+      return create(input, rowType);
+    default:
+      return create(input, collectionType, fieldName);
+    }
   }
 
   /** Returns the row type, guaranteed not null.
