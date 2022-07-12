@@ -96,7 +96,7 @@ public class EnumerableCollect extends Collect implements EnumerableRel {
             "child", result.block);
 
     RelDataType collectionComponentType =
-        requireNonNull(rowType.getFieldList().get(0).getType().getComponentType());
+        requireNonNull(rowType().getFieldList().get(0).getType().getComponentType());
     RelDataType childRecordType = result.physType.getRowType().getFieldList().get(0).getType();
 
     Expression conv_ = child_;
