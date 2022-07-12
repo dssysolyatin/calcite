@@ -105,8 +105,8 @@ public class EnumerableCollect extends Collect implements EnumerableRel {
       // result above is a scalar type we have to wrap it around a physical type capable of
       // representing records. For this reason the following conversion is necessary.
       // REVIEW zabetak January 7, 2019: If we can ensure that the input to this operator
-      // has the correct physical type (e.g., respecting the Prefer.ARRAY above) then this conversion
-      // can be removed.
+      // has the correct physical type (e.g., respecting the Prefer.ARRAY above)
+      // then this conversion can be removed.
       conv_ =
           builder.append(
               "converted", result.physType.convertTo(child_, JavaRowFormat.ARRAY));

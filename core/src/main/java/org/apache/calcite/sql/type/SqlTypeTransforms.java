@@ -177,7 +177,8 @@ public abstract class SqlTypeTransforms {
   public static final SqlTypeTransform TO_MULTISET_QUERY =
       (opBinding, typeToTransform) ->
           TO_MULTISET.transformType(opBinding,
-              SqlTypeUtil.deriveCollectionQueryComponentType(SqlTypeName.MULTISET, typeToTransform));
+              SqlTypeUtil.deriveCollectionQueryComponentType(SqlTypeName.MULTISET,
+                  typeToTransform));
 
   /**
    * Parameter type-inference transform strategy that wraps a given type
