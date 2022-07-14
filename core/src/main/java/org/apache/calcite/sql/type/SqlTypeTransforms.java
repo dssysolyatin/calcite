@@ -174,6 +174,11 @@ public abstract class SqlTypeTransforms {
       (opBinding, typeToTransform) ->
           opBinding.getTypeFactory().createMultisetType(typeToTransform, -1);
 
+  /**
+   * Parameter type-inference transform strategy that wraps a given type in a multiset or
+   * wraps a field of the given type in a multiset if the given type is struct with one field.
+   * It is used when a multiset input is a sub-query.
+   */
   public static final SqlTypeTransform TO_MULTISET_QUERY =
       (opBinding, typeToTransform) ->
           TO_MULTISET.transformType(opBinding,
@@ -189,6 +194,12 @@ public abstract class SqlTypeTransforms {
   public static final SqlTypeTransform TO_ARRAY =
       (opBinding, typeToTransform) ->
           opBinding.getTypeFactory().createArrayType(typeToTransform, -1);
+
+  /**
+   * Parameter type-inference transform strategy that wraps a given type in an array or
+   * wraps a field of the given type in an array if the given type is struct with one field.
+   * It is used when an array input is a sub-query.
+   */
   public static final SqlTypeTransform TO_ARRAY_QUERY =
       (opBinding, typeToTransform) ->
         TO_ARRAY.transformType(opBinding,

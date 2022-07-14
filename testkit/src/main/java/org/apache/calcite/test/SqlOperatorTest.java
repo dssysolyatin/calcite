@@ -7125,6 +7125,12 @@ public class SqlOperatorTest {
     f.checkFails("^Array[]^", "Require at least 1 argument", false);
   }
 
+  /**
+   * Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-4999">[CALCITE-4999]
+   * ARRAY, MULTISET functions should return an collection of scalars
+   * if a sub-query returns 1 column</a>.
+   */
   @Test void testArrayQueryConstructor() {
     final SqlOperatorFixture f = fixture();
     f.setFor(SqlStdOperatorTable.ARRAY_QUERY, SqlOperatorFixture.VmName.EXPAND);
@@ -7135,6 +7141,12 @@ public class SqlOperatorTest {
         "[{1, 2}]");
   }
 
+  /**
+   * Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-4999">[CALCITE-4999]
+   * ARRAY, MULTISET functions should return an collection of scalars
+   * if a sub-query returns 1 column</a>.
+   */
   @Test void testMultisetQueryConstructor() {
     final SqlOperatorFixture f = fixture();
     f.setFor(SqlStdOperatorTable.MULTISET_QUERY, SqlOperatorFixture.VmName.EXPAND);

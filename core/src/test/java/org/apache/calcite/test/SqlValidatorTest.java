@@ -8121,6 +8121,12 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
         .columnType("CHAR(3) ARRAY NOT NULL");
   }
 
+  /**
+   * Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-4999">[CALCITE-4999]
+   * ARRAY, MULTISET functions should return a collection of scalars
+   * if a sub-query returns 1 column</a>.
+   */
   @Test void testArrayQueryConstructor() {
     sql("select array(select 1)")
         .columnType("INTEGER NOT NULL ARRAY NOT NULL");
@@ -8212,6 +8218,12 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
         .columnType("INTEGER MULTISET NOT NULL");
   }
 
+  /**
+   * Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-4999">[CALCITE-4999]
+   * ARRAY, MULTISET functions should return an collection of scalars
+   * if a sub-query returns 1 column</a>.
+   */
   @Test void testMultisetQueryConstructor() {
     sql("select multiset(select 1)")
         .columnType("INTEGER NOT NULL MULTISET NOT NULL");
