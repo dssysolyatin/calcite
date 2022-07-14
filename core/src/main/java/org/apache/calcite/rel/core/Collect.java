@@ -125,6 +125,7 @@ public class Collect extends SingleRel {
    * @param collectionType ARRAY, MAP or MULTISET
    * @param fieldName      Name of the sole output field
    */
+  @Deprecated // to be removed before 2.0
   public static Collect create(RelNode input,
       SqlTypeName collectionType,
       String fieldName) {
