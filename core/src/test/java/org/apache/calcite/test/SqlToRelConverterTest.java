@@ -4678,4 +4678,9 @@ class SqlToRelConverterTest extends SqlToRelTestBase {
         .withConformance(SqlConformanceEnum.LENIENT)
         .ok();
   }
+
+  @Test void testDynamicVariableDoubleCast() {
+    String sql = "SELECT CAST(CAST(? AS INTEGER) AS CHAR)";
+    sql(sql).ok();
+  }
 }
