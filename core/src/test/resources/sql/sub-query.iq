@@ -3575,4 +3575,13 @@ SELECT ARRAY(SELECT s.x) FROM (SELECT 1 as x) s;
 
 !ok
 
+SELECT (SELECT json_object('1': (a.attidentity = 'a'), '2': v) FROM UNNEST(ARRAY[1]) as v) as options
+FROM UNNEST(ARRAY['a', 'b']) AS a(attidentity);
+
+!ok
+
+SELECT (SELECT a.attidentity = 'a', v FROM UNNEST(ARRAY[1]) as v) as options
+FROM UNNEST(ARRAY['a', 'b']) AS a(attidentity);
+
+!ok
 # End sub-query.iq
