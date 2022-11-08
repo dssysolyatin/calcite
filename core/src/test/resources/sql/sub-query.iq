@@ -234,6 +234,12 @@ where (gender, deptno) in (select gender, 10 from emp where gender = 'F');
 
 !ok
 
+SELECT
+  (SELECT 1 FROM emp d WHERE d.gender = a.gender LIMIT 1) AS t1,
+  (SELECT a.gender = 'F' FROM emp s LIMIT 1) as t2
+FROM emp a;
+!ok
+
 !use scott
 
 # [CALCITE-1155] Support columns for IN list
