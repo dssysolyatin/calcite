@@ -3583,4 +3583,11 @@ FROM UNNEST(ARRAY['a', 'b']) AS a(attidentity);
 
 !ok
 
+SELECT
+  (SELECT 1 FROM emp d WHERE d.job = a.job LIMIT 1) AS t1,
+  (SELECT a.job = 'PRESIDENT' FROM emp s LIMIT 1) as t2
+FROM emp a;
+
+!ok
+
 # End sub-query.iq
