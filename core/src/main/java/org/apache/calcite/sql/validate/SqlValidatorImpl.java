@@ -324,15 +324,20 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     if (config.conformance().allowCoercionStringToArray()) {
       SqlTypeCoercionRule rules = requireNonNull(config.typeCoercionRules() != null
           ? config.typeCoercionRules() : SqlTypeCoercionRule.THREAD_PROVIDERS.get());
-
+      // TODO: Refactor this place
       ImmutableSet<SqlTypeName> arrayMapping = ImmutableSet.<SqlTypeName>builder()
           .addAll(rules.getTypeMapping().getOrDefault(SqlTypeName.ARRAY, ImmutableSet.of()))
           .add(SqlTypeName.VARCHAR)
           .add(SqlTypeName.CHAR)
           .build();
-
+      ImmutableSet<SqlTypeName> varcharMapping = ImmutableSet.<SqlTypeName>builder()
+          .addAll(rules.getTypeMapping().getOrDefault(SqlTypeName.VARCHAR, ImmutableSet.of()))
+          .add(SqlTypeName.ARRAY)
+          .add(SqlTypeName.MULTISET)
+          .build();
       Map<SqlTypeName, ImmutableSet<SqlTypeName>> mapping = new HashMap(rules.getTypeMapping());
       mapping.replace(SqlTypeName.ARRAY, arrayMapping);
+      mapping.replace(SqlTypeName.VARCHAR, varcharMapping);
       rules = SqlTypeCoercionRule.instance(mapping);
 
       SqlTypeCoercionRule.THREAD_PROVIDERS.set(rules);

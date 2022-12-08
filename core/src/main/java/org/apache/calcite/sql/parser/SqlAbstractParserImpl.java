@@ -19,6 +19,7 @@ package org.apache.calcite.sql.parser;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.avatica.util.TimeUnit;
 import org.apache.calcite.config.CharLiteralStyle;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.TimeFrameSet;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.runtime.CalciteException;
@@ -33,6 +34,7 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlUnresolvedFunction;
 import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.util.Glossary;
 
@@ -557,6 +559,11 @@ public abstract class SqlAbstractParserImpl {
    */
   public abstract void setConformance(SqlConformance conformance);
 
+  /**
+   * Parses literal.
+   */
+  public abstract SqlNode parseLiteral(RelDataType dataType, LexicalState state);
+  
   /**
    * Parses string to array literal.
    */

@@ -358,4 +358,6 @@ public class Shuttle {
             constructorDeclaration.parameters,
             body);
   }
+
+  public Expression visit(final ClassLiteralExpression classLiteralExpression) { return classLiteralExpression; }
 }

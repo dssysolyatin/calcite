@@ -212,4 +212,5 @@ public class VisitorImpl<@Nullable R> implements Visitor<R> {
     return whileStatement.body.accept(this);
   }
 
+  @Override public R visit(final ClassLiteralExpression classLiteralExpression) { return null; }
 }

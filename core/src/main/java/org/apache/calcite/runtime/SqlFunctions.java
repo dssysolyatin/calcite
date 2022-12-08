@@ -35,13 +35,16 @@ import org.apache.calcite.linq4j.tree.Primitive;
 import org.apache.calcite.rel.type.TimeFrame;
 import org.apache.calcite.rel.type.TimeFrameSet;
 import org.apache.calcite.runtime.FlatLists.ComparableList;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.fun.SqlLibraryOperators;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.util.NumberUtil;
 import org.apache.calcite.util.TimeWithTimeZoneString;
 import org.apache.calcite.util.TimestampWithTimeZoneString;
 import org.apache.calcite.util.Unsafe;
 import org.apache.calcite.util.Util;
-
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.codec.language.Soundex;
 
@@ -52,6 +55,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.nullness.qual.PolyNull;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
@@ -80,13 +84,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BinaryOperator;
 import java.util.regex.Pattern;
 
-import static org.apache.calcite.linq4j.Nullness.castNonNull;
-import static org.apache.calcite.util.Static.RESOURCE;
-
 import static java.lang.Math.floorDiv;
 import static java.lang.Math.floorMod;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
+import static org.apache.calcite.linq4j.Nullness.castNonNull;
+import static org.apache.calcite.util.Static.RESOURCE;
 
 /**
  * Helper methods to implement SQL functions in generated code.
@@ -3084,6 +3087,42 @@ public class SqlFunctions {
       --x;
     }
     return x;
+  }
+
+  /**
+   * TODO: Add documentnation
+   */
+  public static String convertArrayToStringPostgresqlStyle(List<Object> list, 
+      Function1<Object, String> elementConverter) {
+    StringBuilder builder = new StringBuilder();
+    builder.append('{');
+    for (Object el : list) {
+      builder.append(elementConverter.apply(el));
+      builder.append(',');
+    }
+    if (builder.length() > 1) {
+      builder.delete(builder.length() - 1, builder.length());
+    }
+    builder.append('}');
+    return builder.toString();
+  }
+
+  /**
+   * TODO: Add documentation
+   */
+  public static List<? extends Object> convertStringToArrayPostgresqlStyle(String s, 
+      DataContext root, Type expectedType) {
+    try {
+      final SqlNode node = SqlParserUtil.parseArrayLiteral(s);
+      return requireNonNull(SqlUtil.extractLiteralValue(
+          node,
+          requireNonNull(DataContext.Variable.TIME_FRAME_SET.get(root)),
+          List.class,
+          expectedType
+      ));
+    } catch (SqlParseException e) {
+      throw Util.toUnchecked(e);
+    }
   }
 
   /**
