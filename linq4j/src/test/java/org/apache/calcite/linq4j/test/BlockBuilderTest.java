@@ -24,11 +24,13 @@ import org.apache.calcite.linq4j.tree.Expressions;
 import org.apache.calcite.linq4j.tree.OptimizeShuttle;
 import org.apache.calcite.linq4j.tree.ParameterExpression;
 import org.apache.calcite.linq4j.tree.Shuttle;
+import org.apache.calcite.linq4j.tree.Types;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.function.Function;
 
 import static org.apache.calcite.linq4j.test.BlockBuilderBase.FOUR;
@@ -48,6 +50,38 @@ class BlockBuilderTest {
     b = new BlockBuilder(true);
   }
 
+  @Test void testReuseCollectionExpression() throws NoSuchMethodException {
+    Method putMethod = HashMap.class.getMethod("put", Object.class, Object.class);
+    Method sizeMethod = HashMap.class.getMethod("size");
+    
+    Expression multiMapParent = b.append("multiMap", Expressions.new_(Types.of(HashMap.class)));
+    b.add(Expressions.statement(
+        Expressions.call(multiMapParent, putMethod, Expressions.box(ONE), Expressions.box(ONE))));
+    
+    BlockBuilder nested = new BlockBuilder(true, b);
+    Expression multiMapNested = nested.append("multiMap",
+        Expressions.new_(Types.of(HashMap.class)));
+    nested.add(Expressions.statement(
+        Expressions.call(multiMapNested, putMethod, Expressions.box(TWO), Expressions.box(TWO))));
+    nested.add(Expressions.call(multiMapNested, sizeMethod));
+    
+    b.add(nested.toBlock());
+    b.append(Expressions.call(multiMapParent, sizeMethod));
+    
+    // It is wrong output. Map should be reused
+    assertEquals(
+        "{\n"
+            + "  final java.util.HashMap multiMap = new java.util.HashMap();\n"
+            + "  multiMap.put(Integer.valueOf(1), Integer.valueOf(1));\n"
+            + "  {\n"
+            + "    multiMap.put(Integer.valueOf(2), Integer.valueOf(2));\n"
+            + "    return multiMap.size();\n"
+            + "  }\n"
+            + "  return multiMap.size();\n"
+            + "}\n",
+        b.toBlock().toString());
+  }
+  
   @Test void testReuseExpressionsFromUpperLevel() {
     Expression x = b.append("x", Expressions.add(ONE, TWO));
     BlockBuilder nested = new BlockBuilder(true, b);
