@@ -610,6 +610,14 @@ public abstract class Expressions {
   }
 
   /**
+   * Creates a ClassLiteralExpression representing a class literal.
+   * For example: {@code String.class}
+   */
+  public static ClassLiteralExpression classLiteral(Type type) {
+    return new ClassLiteralExpression(type);
+  }
+
+  /**
    * Creates a UnaryExpression that represents a conversion
    * operation that throws an exception if the target type is
    * overflowed.

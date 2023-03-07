@@ -316,7 +316,10 @@ class BabelParserTest extends SqlParserTest {
         .ok("SELECT (ARRAY['1', '2', '3'])");
     sql("select array '{null, 1, null, 2}'")
         .ok("SELECT (ARRAY[NULL, 1, NULL, 2])");
-
+    sql("select array '{true, false, false, true}'")
+        .ok("SELECT (ARRAY[TRUE, FALSE, FALSE, TRUE])");
+//    sql("select array '{test \\\"test123\\\"  , 123, FALSE, TRUE}'")
+//        .ok("SELECT (ARRAY['test123', 123, FALSE, TRUE])");
     sql("select array ^'null, 1, null, 2'^")
         .fails("Illegal array expression 'null, 1, null, 2'");
   }

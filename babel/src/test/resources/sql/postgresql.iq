@@ -39,6 +39,9 @@ EXPR$0
 false
 !ok
 
+select ARRAY[TIMESTAMP '2000-07-20 20:17:40', TIMESTAMP '2001-07-20 20:17:40'] || array '{"2000-07-20 20:17:40", "2001-07-20 20:17:40"}';
+!ok
+
 # Test coercion string to array inside INSERT
 create table sal_emp (name varchar, pay_by_quarter int array, schedule varchar array array);
 (0 rows modified)

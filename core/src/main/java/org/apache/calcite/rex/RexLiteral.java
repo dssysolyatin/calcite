@@ -380,6 +380,7 @@ public class RexLiteral extends RexNode {
     case SYMBOL:
       return value instanceof Enum;
     case ROW:
+    case ARRAY:
     case MULTISET:
       return value instanceof List;
     case GEOMETRY:

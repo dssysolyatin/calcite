@@ -17,8 +17,11 @@
 package org.apache.calcite.sql;
 
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.avatica.util.TimeUnit;
 import org.apache.calcite.linq4j.Ord;
+import org.apache.calcite.linq4j.function.Experimental;
 import org.apache.calcite.linq4j.function.Functions;
+import org.apache.calcite.linq4j.tree.Types;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.Hintable;
@@ -26,9 +29,12 @@ import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypePrecedenceList;
+import org.apache.calcite.rel.type.TimeFrame;
+import org.apache.calcite.rel.type.TimeFrameSet;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.runtime.CalciteException;
 import org.apache.calcite.runtime.Resources;
+import org.apache.calcite.sql.fun.SqlLiteralChainOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlOperandMetadata;
@@ -42,6 +48,7 @@ import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.BarfingInvocationHandler;
 import org.apache.calcite.util.ConversionUtil;
 import org.apache.calcite.util.Glossary;
+import org.apache.calcite.util.ImmutableNullableList;
 import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
@@ -50,12 +57,16 @@ import org.apache.calcite.util.Util;
 import com.google.common.base.Predicates;
 import com.google.common.base.Utf8;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 
+import org.apiguardian.api.API;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.nullness.qual.PolyNull;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
@@ -73,6 +84,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.apache.calcite.util.Static.RESOURCE;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Contains utility functions related to SQL parsing, all static.
@@ -1101,6 +1114,85 @@ public abstract class SqlUtil {
   }
 
   /**
+   * Gets the value from {@code SqlNode} as a Calcite type.
+   *
+   * @param node SqlNode
+   * @param clazz
+   * @param timeFrameSet
+   * @return
+   * @param <T>
+   */
+  @API(since = "1.35", status = API.Status.EXPERIMENTAL)
+  public static <T> @Nullable T extractValue(SqlNode node, Class<T> clazz,
+      @Nullable TimeFrameSet timeFrameSet) {
+    final SqlLiteral literal;
+    switch (node.getKind()) {
+    case ARRAY_VALUE_CONSTRUCTOR:
+      final List<@Nullable Object> list = new ArrayList<>();
+      for (SqlNode o : ((SqlCall) node).getOperandList()) {
+        list.add(extractValue(o, Object.class, timeFrameSet));
+      }
+      return clazz.cast(ImmutableNullableList.copyOf(list));
+
+    case MAP_VALUE_CONSTRUCTOR:
+      final ImmutableMap.Builder<Object, Object> builder2 =
+          ImmutableMap.builder();
+      final List<SqlNode> operands = ((SqlCall) node).getOperandList();
+      for (int i = 0; i < operands.size(); i += 2) {
+        final SqlNode key = operands.get(i);
+        final SqlNode value = operands.get(i + 1);
+        builder2.put(requireNonNull(extractValue(key, Object.class, timeFrameSet), "key"),
+            requireNonNull(extractValue(value, Object.class, timeFrameSet), "value"));
+      }
+      return clazz.cast(builder2.build());
+
+    case CAST:
+      return extractValue(((SqlCall) node).operand(0), clazz, timeFrameSet);
+
+    case LITERAL:
+      literal = (SqlLiteral) node;
+      if (literal.getTypeName() == SqlTypeName.NULL) {
+        return null;
+      }
+      return literal.getValueAs(clazz);
+
+    case LITERAL_CHAIN:
+      literal = SqlLiteralChainOperator.concatenateOperands((SqlCall) node);
+      return literal.getValueAs(clazz);
+
+    case INTERVAL_QUALIFIER:
+      final SqlIntervalQualifier q = (SqlIntervalQualifier) node;
+      if (q.timeFrameName != null) {
+        // Custom time frames can only be cast to String. You can do more with
+        // them when validator has resolved to a TimeFrame.
+        final TimeFrame timeFrame = requireNonNull(timeFrameSet).getOpt(q.timeFrameName);
+        if (clazz == String.class) {
+          return clazz.cast(q.timeFrameName);
+        }
+        if (clazz == TimeUnit.class
+            && timeFrame != null) {
+          TimeUnit timeUnit = timeFrameSet.getUnit(timeFrame);
+          return clazz.cast(timeUnit);
+        }
+        return null;
+      }
+      final SqlIntervalLiteral.IntervalValue intervalValue =
+          new SqlIntervalLiteral.IntervalValue(q, 1, q.toString());
+      literal = new SqlLiteral(intervalValue, q.typeName(), q.pos);
+      return literal.getValueAs(clazz);
+
+    case DEFAULT:
+      return null; // currently NULL is the only default value
+
+    default:
+      if (SqlUtil.isNullLiteral(node, true)) {
+        return null; // NULL literal
+      }
+      return null; // not a literal
+    }
+  }
+  
+  /**
    * Returns an immutable list of {@link RelHint} from sql hints, with a given
    * inherit path from the root node.
    *
@@ -1223,7 +1315,7 @@ public abstract class SqlUtil {
     SqlNode rightNode = createBalancedCall(op, pos, operands, mid, end);
     return op.createCall(pos, leftNode, rightNode);
   }
-
+  
   //~ Inner Classes ----------------------------------------------------------
 
   /**

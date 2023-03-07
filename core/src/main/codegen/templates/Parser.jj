@@ -4607,7 +4607,7 @@ SqlLiteral DateTimeLiteral() :
         return SqlParserUtil.parseDateLiteral(p, getPos());
     }
 |
-    <LBRACE_T> <QUOTED_STRING> {
+    <LBRACE> <T> <QUOTED_STRING> {
         p = SqlParserUtil.parseString(token.image);
     }
     <RBRACE> {
@@ -4752,6 +4752,7 @@ SqlCall ArrayLiteral() :
 {
     <LBRACE> { s = span(); }
     (
+        LOOKAHEAD(2)
         e = Literal() { list = startList(e); }
         ( <COMMA> e = Literal() { list.add(e); } )*
     |
@@ -8505,8 +8506,8 @@ void NonReservedKeyWord2of3() :
 |   < RPAREN: ")">
 <#if (parser.includeBraces!default.parser.includeBraces) >
 |   < LBRACE_D: "{" (" ")* ["d","D"] >
-|   < LBRACE_T: "{" (" ")* ["t","T"] >
-|   < LBRACE_TS: "{" (" ")* ["t","T"] ["s","S"] >
+|   < T: ["t","T"] >
+|   < LBRACE_TS: "{" (" ")* <T> ["s","S"] >
 |   < LBRACE_FN: "{" (" ")* ["f","F"] ["n","N"] >
 |   < LBRACE: "{" >
 |   < RBRACE: "}" >

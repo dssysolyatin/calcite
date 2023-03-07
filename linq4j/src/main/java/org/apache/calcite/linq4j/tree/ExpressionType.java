@@ -596,7 +596,12 @@ public enum ExpressionType {
   /**
    * While loop.
    */
-  While;
+  While,
+
+  /**
+   * Class literal. "Type.class"
+   */
+  ClassLiteral;
 
   final @Nullable String op;
   final @Nullable String op2;

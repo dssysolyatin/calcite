@@ -272,76 +272,7 @@ public class SqlCallBinding extends SqlOperatorBinding {
   @Override public <T extends Object> @Nullable T getOperandLiteralValue(int ordinal,
       Class<T> clazz) {
     final SqlNode node = operand(ordinal);
-    return valueAs(node, clazz);
-  }
-
-  private <T extends Object> @Nullable T valueAs(SqlNode node, Class<T> clazz) {
-    final SqlLiteral literal;
-    switch (node.getKind()) {
-    case ARRAY_VALUE_CONSTRUCTOR:
-      final List<@Nullable Object> list = new ArrayList<>();
-      for (SqlNode o : ((SqlCall) node).getOperandList()) {
-        list.add(valueAs(o, Object.class));
-      }
-      return clazz.cast(ImmutableNullableList.copyOf(list));
-
-    case MAP_VALUE_CONSTRUCTOR:
-      final ImmutableMap.Builder<Object, Object> builder2 =
-          ImmutableMap.builder();
-      final List<SqlNode> operands = ((SqlCall) node).getOperandList();
-      for (int i = 0; i < operands.size(); i += 2) {
-        final SqlNode key = operands.get(i);
-        final SqlNode value = operands.get(i + 1);
-        builder2.put(requireNonNull(valueAs(key, Object.class), "key"),
-            requireNonNull(valueAs(value, Object.class), "value"));
-      }
-      return clazz.cast(builder2.build());
-
-    case CAST:
-      return valueAs(((SqlCall) node).operand(0), clazz);
-
-    case LITERAL:
-      literal = (SqlLiteral) node;
-      if (literal.getTypeName() == SqlTypeName.NULL) {
-        return null;
-      }
-      return literal.getValueAs(clazz);
-
-    case LITERAL_CHAIN:
-      literal = SqlLiteralChainOperator.concatenateOperands((SqlCall) node);
-      return literal.getValueAs(clazz);
-
-    case INTERVAL_QUALIFIER:
-      final SqlIntervalQualifier q = (SqlIntervalQualifier) node;
-      if (q.timeFrameName != null) {
-        // Custom time frames can only be cast to String. You can do more with
-        // them when validator has resolved to a TimeFrame.
-        final TimeFrameSet timeFrameSet = validator.getTimeFrameSet();
-        final TimeFrame timeFrame = timeFrameSet.getOpt(q.timeFrameName);
-        if (clazz == String.class) {
-          return clazz.cast(q.timeFrameName);
-        }
-        if (clazz == TimeUnit.class
-            && timeFrame != null) {
-          TimeUnit timeUnit = timeFrameSet.getUnit(timeFrame);
-          return clazz.cast(timeUnit);
-        }
-        return null;
-      }
-      final SqlIntervalLiteral.IntervalValue intervalValue =
-          new SqlIntervalLiteral.IntervalValue(q, 1, q.toString());
-      literal = new SqlLiteral(intervalValue, q.typeName(), q.pos);
-      return literal.getValueAs(clazz);
-
-    case DEFAULT:
-      return null; // currently NULL is the only default value
-
-    default:
-      if (SqlUtil.isNullLiteral(node, true)) {
-        return null; // NULL literal
-      }
-      return null; // not a literal
-    }
+    return SqlUtil.extractValue(node, clazz, validator.getTimeFrameSet());
   }
 
   @Override public boolean isOperandNull(int ordinal, boolean allowCast) {

@@ -120,6 +120,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.Time;
@@ -553,6 +555,10 @@ public enum BuiltInMethod {
   CURRENT_TIMESTAMP(SqlFunctions.class, "currentTimestamp", DataContext.class),
   CURRENT_TIME(SqlFunctions.class, "currentTime", DataContext.class),
   CURRENT_DATE(SqlFunctions.class, "currentDate", DataContext.class),
+  CONVERT_ARRAY_TO_STRING(SqlFunctions.class,
+      "convertArrayToString", List.class, Function1.class),
+  CONVERT_STRING_TO_ARRAY(SqlFunctions.class,
+      "convertStringToArray", String.class, DataContext.class, ParameterizedType.class),
   LOCAL_TIMESTAMP(SqlFunctions.class, "localTimestamp", DataContext.class),
   LOCAL_TIME(SqlFunctions.class, "localTime", DataContext.class),
   TIME_ZONE(SqlFunctions.class, "timeZone", DataContext.class),
@@ -681,7 +687,8 @@ public enum BuiltInMethod {
       long.class),
   BIG_DECIMAL_ADD(BigDecimal.class, "add", BigDecimal.class),
   BIG_DECIMAL_NEGATE(BigDecimal.class, "negate"),
-  COMPARE_TO(Comparable.class, "compareTo", Object.class);
+  COMPARE_TO(Comparable.class, "compareTo", Object.class),
+  TYPE_OF(Types.class, "of", Type.class, Type.class);
 
   @SuppressWarnings("ImmutableEnumChecker")
   public final Method method;

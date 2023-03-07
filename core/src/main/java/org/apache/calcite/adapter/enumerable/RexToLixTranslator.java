@@ -67,6 +67,7 @@ import com.google.common.base.CaseFormat;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import org.apiguardian.api.API;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.locationtech.jts.geom.Geometry;
 
@@ -526,6 +527,39 @@ public class RexToLixTranslator implements RexVisitor<RexToLixTranslator.Result>
                 Expressions.call(BuiltInMethod.BOOLEAN_TO_STRING.method,
                     operand));
         break;
+      case ARRAY:
+      case MULTISET:
+        final RelDataType componentType = requireNonNull(sourceType.getComponentType());
+        final Type javaType = Primitive.box(typeFactory.getJavaClass(componentType));
+        final ParameterExpression componentElementExpr =
+            Expressions.parameter(Modifier.FINAL, Object.class, "element");
+        final Expression componentConvertLambda =
+            Expressions.lambda(
+                Expressions.block(
+                Expressions.return_(null,
+                    translateCast(componentType, targetType, Expressions.convert_(componentElementExpr, javaType)))), componentElementExpr);
+
+        convert =
+            RexImpTable.optimize2(
+                operand, Expressions.call(BuiltInMethod.CONVERT_ARRAY_TO_STRING.method, operand,
+                componentConvertLambda));
+        break;
+        // convert to json
+      default:
+        break;
+      }
+      break;
+    case ARRAY:
+    case MULTISET:
+      switch (sourceType.getSqlTypeName()) {
+      case VARCHAR:
+      case CHAR:
+        convert =
+            RexImpTable.optimize2(
+                operand, Expressions.call(
+                BuiltInMethod.CONVERT_STRING_TO_ARRAY.method,
+                operand, getRoot(), translateRelDataTypeToJavaType(targetType)));
+        break;
       default:
         break;
       }
@@ -628,6 +662,7 @@ public class RexToLixTranslator implements RexVisitor<RexToLixTranslator.Result>
   private @Nullable Expression translateCastToTime(RelDataType sourceType,
       Expression operand) {
     Expression convert = null;
+
     switch (sourceType.getSqlTypeName()) {
     case CHAR:
     case VARCHAR:
@@ -662,6 +697,26 @@ public class RexToLixTranslator implements RexVisitor<RexToLixTranslator.Result>
       break;
     }
     return convert;
+  }
+
+  /**
+   * Converts {@code RelDataType} to {@code java.lang.reflect.Type}
+   */
+  private Expression translateRelDataTypeToJavaType(RelDataType dataType) {
+    switch (dataType.getSqlTypeName()) {
+    case ARRAY:
+    case MULTISET:
+      return Expressions.call(BuiltInMethod.TYPE_OF.method,
+          Expressions.classLiteral(typeFactory.getJavaClass(dataType)),
+          translateRelDataTypeToJavaType(requireNonNull(dataType.getComponentType())));
+    case MAP:
+      return Expressions.call(BuiltInMethod.TYPE_OF.method,
+          Expressions.classLiteral(typeFactory.getJavaClass(dataType)),
+          translateRelDataTypeToJavaType(requireNonNull(dataType.getKeyType())),
+          translateRelDataTypeToJavaType(requireNonNull(dataType.getValueType())));
+    default:
+      return Expressions.classLiteral(Primitive.box(typeFactory.getJavaClass(dataType)));
+    }
   }
 
   private @Nullable Expression translateCastToDate(RelDataType sourceType,

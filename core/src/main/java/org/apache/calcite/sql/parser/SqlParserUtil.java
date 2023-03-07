@@ -19,6 +19,7 @@ package org.apache.calcite.sql.parser;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.config.CalciteSystemProperty;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlBinaryOperator;
@@ -41,6 +42,7 @@ import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.impl.SqlParserImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.PrecedenceClimbingParser;
 import org.apache.calcite.util.TimeString;
@@ -54,6 +56,7 @@ import com.google.common.collect.ImmutableList;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 
+import java.io.Reader;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -399,6 +402,18 @@ public final class SqlParserUtil {
     return parser.parseArray();
   }
 
+  public static SqlNode parseArrayLiteral(String s, 
+      @Nullable RelDataType componentType) throws SqlParseException {
+    SqlAbstractParserImpl parser =
+        SqlParserImpl.FACTORY.getParser(new StringReader(s));
+    
+    if (componentType == null) {
+      return parser.parseArray();
+    }
+    
+    return parser.parseArray();
+  }
+  
   /**
    * Checks if the date/time format is valid, throws if not.
    *

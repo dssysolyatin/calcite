@@ -575,5 +575,5 @@ public interface SqlConformance {
    * false otherwise.
    */
   @Experimental
-  boolean allowCoercionStringToArray();
+  boolean allowCoercionBetweenStringAndArray();
 }

@@ -35,7 +35,11 @@ import org.apache.calcite.linq4j.tree.Primitive;
 import org.apache.calcite.rel.type.TimeFrame;
 import org.apache.calcite.rel.type.TimeFrameSet;
 import org.apache.calcite.runtime.FlatLists.ComparableList;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.fun.SqlLibraryOperators;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.util.NumberUtil;
 import org.apache.calcite.util.TimeWithTimeZoneString;
 import org.apache.calcite.util.TimestampWithTimeZoneString;
@@ -54,6 +58,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.nullness.qual.PolyNull;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
@@ -3647,6 +3652,51 @@ public class SqlFunctions {
             withOrdinality);
       }
     };
+  }
+
+  /**
+   * Converts {@code List} to {@code String}.
+   *
+   * @param list input {@code List} to be converted to a string
+   * @param valueConverter function that converts each value in the {@code list}
+   *                       to a @{code String}
+   * @return the resulting string in the following format "{ val1, val2, val3 ... }"
+   */
+  public static String convertArrayToString(List<Object> list,
+      Function1<Object, String> valueConverter) {
+    StringBuilder builder = new StringBuilder();
+    builder.append('{');
+    for (Object el : list) {
+      builder.append(valueConverter.apply(el));
+      builder.append(',');
+    }
+    if (builder.length() > 1) {
+      builder.delete(builder.length() - 1, builder.length());
+    }
+    builder.append('}');
+    return builder.toString();
+  }
+
+
+  /**
+   * Converts {@code String} in the format "{ val1, val2, val3 ... }" to {@code List}.
+   * If the input string is not in this format, the method will throw a {@code RuntimeException}.
+   *
+   * @param str input string
+   * @param root DataContext
+   * @param expectedType expected {@code List} type
+   * @return the resulting {@code List}
+   */
+  public static List convertStringToArray(String str,
+      DataContext root, Type expectedType) {
+    // Need to parse literal, not array
+    try {
+      final SqlNode node = SqlParserUtil.parseArrayLiteral(str);
+      return requireNonNull(SqlUtil.extractValue(node, List.class, 
+          DataContext.Variable.TIME_FRAME_SET.get(root)));
+    } catch (SqlParseException e) {
+      throw Util.toUnchecked(e);
+    }
   }
 
   /**

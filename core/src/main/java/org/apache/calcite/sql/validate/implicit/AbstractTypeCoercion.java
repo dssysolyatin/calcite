@@ -534,7 +534,7 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
       return type2;
     }
 
-    if (validator.config().conformance().allowCoercionStringToArray()) {
+    if (validator.config().conformance().allowCoercionBetweenStringAndArray()) {
       if (SqlTypeUtil.isString(type1) && SqlTypeUtil.isArray(type2)) {
         return type2;
       }
@@ -738,9 +738,16 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
         || expected == SqlTypeFamily.CHARACTER)) {
       return expected.getDefaultConcreteType(factory);
     }
+
     // CHAR -> GEOMETRY
     if (SqlTypeUtil.isCharacter(in) && expected == SqlTypeFamily.GEO) {
       return expected.getDefaultConcreteType(factory);
+    }
+
+    // ARRAY, MULTISET -> STRING
+    if (validator.config().conformance().allowCoercionBetweenStringAndArray()
+        && SqlTypeUtil.isCollection(in) && expected == SqlTypeFamily.STRING) {
+        return expected.getDefaultConcreteType(factory);
     }
     return null;
   }
@@ -754,8 +761,11 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
       int index,
       RelDataType fromType,
       RelDataType targetType) {
-    if (validator.config().conformance().allowCoercionStringToArray()
-        && SqlTypeUtil.isString(fromType)
+    if (!validator.config().conformance().allowCoercionBetweenStringAndArray()) {
+      return false;
+    }
+
+    if (SqlTypeUtil.isString(fromType)
         && SqlTypeUtil.isArray(targetType)
         && operand instanceof SqlCharStringLiteral) {
       try {
@@ -769,6 +779,7 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
       }
       return true;
     }
+
     return false;
   }
 }
