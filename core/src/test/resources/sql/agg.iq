@@ -3485,6 +3485,21 @@ group by
 
 !ok
 
+select
+    case when deptno in (1) then 1 else 2 end as col
+from emp
+group by deptno, case when deptno in (1) then 1 else 0 end;
++-----+
+| COL |
++-----+
+|   2 |
+|   2 |
+|   2 |
++-----+
+(3 rows)
+
+!ok
+
 # Test case for [CALCITE-5388] tempList expression inside EnumerableWindow.getPartitionIterator should be unoptimized
 with
     CTE1(rownr1, val1) as ( select ROW_NUMBER() OVER(ORDER BY id ASC), id from (values (1), (2)) as Vals1(id) ),
