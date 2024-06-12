@@ -6561,7 +6561,8 @@ public class SqlOperatorTest {
       f12.checkString("greatest('show', 'on', 'earth')", "show",
           "VARCHAR(5) NOT NULL");
     };
-    f0.forEachLibrary(list(SqlLibrary.BIG_QUERY, SqlLibrary.ORACLE), consumer);
+    f0.forEachLibrary(list(SqlLibrary.BIG_QUERY, SqlLibrary.ORACLE, SqlLibrary.POSTGRESQL),
+        consumer);
   }
 
   @Test void testLeastFunc() {
@@ -6583,7 +6584,8 @@ public class SqlOperatorTest {
       f12.checkString("least('show', 'on', 'earth')", "earth",
           "VARCHAR(5) NOT NULL");
     };
-    f0.forEachLibrary(list(SqlLibrary.BIG_QUERY, SqlLibrary.ORACLE), consumer);
+    f0.forEachLibrary(list(SqlLibrary.BIG_QUERY, SqlLibrary.ORACLE, SqlLibrary.POSTGRESQL),
+        consumer);
   }
 
   @Test void testNvlFunc() {
