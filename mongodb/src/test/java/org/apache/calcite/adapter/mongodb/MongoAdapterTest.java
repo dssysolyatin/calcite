@@ -819,6 +819,12 @@ public class MongoAdapterTest implements SchemaFactory {
     };
   }
 
+  @Test void testCalciteFunc() {
+    assertModel(MODEL)
+        .query("select CHAR_LENGTH(state) from zips")
+        .runs();
+  }
+
   @Test void testColumnQuoting() {
     assertModel(MODEL)
         .query("select state as \"STATE\", avg(pop) as \"AVG(pop)\" "
