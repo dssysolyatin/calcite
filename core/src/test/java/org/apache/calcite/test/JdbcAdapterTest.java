@@ -1309,6 +1309,24 @@ class JdbcAdapterTest {
     });
   }
 
+  @Test void testTableModifyDelete2() throws Exception {
+    final AssertThat that = CalciteAssert
+        .model(FoodmartSchema.FOODMART_MODEL)
+        .enable(CalciteAssert.DB == DatabaseInstance.HSQLDB);
+
+    that.doWithConnection(connection -> {
+      try (LockWrapper ignore = exclusiveCleanDb(connection)) {
+        final String sql = "delete from \"sales_fact_1997\" b where exists (\n"
+            + "  select 1 from \"product\" a where a.\"product_class_id\"=10 and a.\"product_id\"=b.\"product_id\"\n"
+            + ")";
+        that.query(sql)
+            .planUpdateHasSql("DELETE FROM \"foodmart\".\"sales_fact_1997\"", 86837);
+      } catch (SQLException e) {
+        throw TestUtil.rethrow(e);
+      }
+    });
+  }
+
   @Test void testTableModifyDelete() throws Exception {
     final AssertThat that = CalciteAssert
         .model(FoodmartSchema.FOODMART_MODEL)

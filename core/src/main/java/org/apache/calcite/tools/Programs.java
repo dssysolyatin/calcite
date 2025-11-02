@@ -309,7 +309,8 @@ public class Programs {
         };
 
     List<Program> programs =
-        Lists.newArrayList(subQuery(metadataProvider),
+        Lists.newArrayList(
+           // subQuery(metadataProvider),
         new DecorrelateProgram(),
         measure(metadataProvider),
         new TrimFieldsProgram(),
