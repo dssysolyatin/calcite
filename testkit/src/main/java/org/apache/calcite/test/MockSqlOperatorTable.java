@@ -106,7 +106,8 @@ public class MockSqlOperatorTable extends ChainedSqlOperatorTable {
                 new InvalidTableFunction(),
                 new CompareStringsOrNumericValues(),
                 HIGHER_ORDER_FUNCTION,
-                HIGHER_ORDER_FUNCTION2)));
+                HIGHER_ORDER_FUNCTION2,
+                FILTER_FUNCTION)));
   }
 
   /** Adds a library set. */
@@ -702,5 +703,14 @@ public class MockSqlOperatorTable extends ChainedSqlOperatorTable {
           OperandTypes.sequence("HIGHER_ORDER_FUNCTION(INTEGER, FUNCTION() -> NUMERIC)",
               OperandTypes.family(SqlTypeFamily.INTEGER),
               OperandTypes.function(SqlTypeFamily.NUMERIC)),
+          SqlFunctionCategory.SYSTEM);
+
+  private static final SqlFunction FILTER_FUNCTION =
+      SqlBasicFunction.create("FILTER_FUNCTION",
+          ReturnTypes.ARG0,
+          OperandTypes.sequence("FILTER_FUNCTION(ARRAY, FUNCTION(INTEGER) -> BOOLEAN)",
+              OperandTypes.ARRAY_OF_INTEGER,
+              OperandTypes.function(
+                  SqlTypeFamily.BOOLEAN, SqlTypeFamily.INTEGER)),
           SqlFunctionCategory.SYSTEM);
 }

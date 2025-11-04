@@ -143,6 +143,15 @@ class SqlToRelConverterTest extends SqlToRelTestBase {
         .ok();
   }
 
+  @Test void testLambdaExpressionWithIn() {
+    final String sql = "select filter_function(ARRAY[1,2,3,4], (n) -> n IN (1,3))";
+    fixture()
+        .withFactory(c ->
+            c.withOperatorTable(t -> MockSqlOperatorTable.standard().extend()))
+        .withSql(sql)
+        .ok();
+  }
+
   /** Test case for
    * <a href="https://issues.apache.org/jira/browse/CALCITE-3679">[CALCITE-3679]
    * Allow lambda expressions in SQL queries</a>. */
