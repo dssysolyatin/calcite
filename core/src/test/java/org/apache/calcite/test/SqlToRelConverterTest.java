@@ -167,6 +167,15 @@ class SqlToRelConverterTest extends SqlToRelTestBase {
         .ok();
   }
 
+  @Test void testLambdaExpressionWithRowParameter() {
+    final String sql = "select \"EXISTS\"(array(ROW(true, false)), x -> x.\"EXPR$1\")";
+    fixture()
+        .withFactory(c ->
+            c.withOperatorTable(t -> SqlValidatorTest.operatorTableFor(SqlLibrary.SPARK)))
+        .withSql(sql)
+        .ok();
+  }
+
   @Test void testDotLiteralAfterRow() {
     final String sql = "select row(1,2).\"EXPR$1\" from emp";
     sql(sql).ok();
