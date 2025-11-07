@@ -41,6 +41,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import java.util.List;
 import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -147,8 +149,10 @@ public abstract class Correlate extends BiRel implements Hintable {
         && RelOptUtil.notContainsCorrelation(left, correlationId, litmus);
   }
 
-  @Override public Correlate copy(RelTraitSet traitSet, List<RelNode> inputs) {
-    assert inputs.size() == 2;
+  @Override public Correlate copy(RelTraitSet traitSet, List<RelNode> inputs, Set<CorrelationId> variablesSet) {
+    checkArgument(inputs.size() == 2);
+    checkArgument(variablesSet.size() == 1);
+
     return copy(traitSet,
         inputs.get(0),
         inputs.get(1),

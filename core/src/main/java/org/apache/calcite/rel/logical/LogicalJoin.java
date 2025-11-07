@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.rel.logical;
 
+import org.apache.calcite.adapter.enumerable.EnumerableBatchNestedLoopJoin;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -173,8 +174,9 @@ public final class LogicalJoin extends Join {
 
   //~ Methods ----------------------------------------------------------------
 
-  @Override public LogicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
-      RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
+  @Override public LogicalJoin copy(RelTraitSet traitSet,
+      RexNode conditionExpr, RelNode left, RelNode right, Set<CorrelationId> variablesSet,
+      JoinRelType joinType, boolean semiJoinDone) {
     assert traitSet.containsIfApplicable(Convention.NONE);
     return new LogicalJoin(getCluster(),
         getCluster().traitSetOf(Convention.NONE), hints, left, right, conditionExpr,

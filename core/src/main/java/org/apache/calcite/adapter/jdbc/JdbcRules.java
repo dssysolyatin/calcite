@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.adapter.jdbc;
 
+import org.apache.calcite.adapter.enumerable.EnumerableBatchNestedLoopJoin;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.plan.Contexts;
@@ -401,9 +402,9 @@ public class JdbcRules {
           CorrelationId.setOf(variablesStopped), joinType);
     }
 
-    @Override public JdbcJoin copy(RelTraitSet traitSet, RexNode condition,
-        RelNode left, RelNode right, JoinRelType joinType,
-        boolean semiJoinDone) {
+    @Override public JdbcJoin copy(RelTraitSet traitSet,
+        RexNode condition, RelNode left, RelNode right, Set<CorrelationId> variablesSet,
+        JoinRelType joinType, boolean semiJoinDone) {
       try {
         return new JdbcJoin(getCluster(), traitSet, left, right,
             condition, variablesSet, joinType);
@@ -559,7 +560,8 @@ public class JdbcRules {
     }
 
     @Override public JdbcProject copy(RelTraitSet traitSet, RelNode input,
-        List<RexNode> projects, RelDataType rowType) {
+        List<RexNode> projects, RelDataType rowType, Set<CorrelationId> variablesSet) {
+      checkArgument(variablesSet.isEmpty());
       return new JdbcProject(getCluster(), traitSet, input, projects, rowType);
     }
 
@@ -627,7 +629,8 @@ public class JdbcRules {
     }
 
     @Override public JdbcFilter copy(RelTraitSet traitSet, RelNode input,
-        RexNode condition) {
+        RexNode condition, Set<CorrelationId> variablesSet) {
+      checkArgument(variablesSet.isEmpty());
       return new JdbcFilter(getCluster(), traitSet, input, condition);
     }
 
