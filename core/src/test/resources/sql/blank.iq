@@ -396,4 +396,43 @@ EnumerableHashJoin(condition=[AND(IS NOT DISTINCT FROM($1, $5), IS NOT DISTINCT 
 !plan
 !}
 
+create table t_dept (deptno int not null, dname varchar(10) not null);
+(0 rows modified)
+
+!update
+
+create table t_emp (empno int not null, ename varchar(10) not null, deptno int not null);
+(0 rows modified)
+
+!update
+
+insert into t_dept values (10, 'SALES'), (20, 'HR'), (30, 'ENG');
+(3 rows modified)
+
+!update
+
+insert into t_emp values (1, 'Alice', 10), (3, 'Carol', 20), (6, 'Frank', 30);
+(3 rows modified)
+
+!update
+
+# [CALCITE-5390] findInputRel shadowing bug with nested scalar subqueries.
+# Correct output verified against PostgreSQL: (10,10), (20,20), (30,30).
+select d.deptno,
+  (select
+    (select e2.deptno from t_emp e2 where e2.deptno = d.deptno LIMIT 1)
+   from t_emp e where e.deptno = d.deptno LIMIT 1
+  ) as cnt
+from t_dept d;
++--------+-----+
+| DEPTNO | CNT |
++--------+-----+
+|     10 |     |
+|     20 |     |
+|     30 |     |
++--------+-----+
+(3 rows)
+
+!ok
+
 # End blank.iq

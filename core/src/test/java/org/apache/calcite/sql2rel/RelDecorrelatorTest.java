@@ -1669,6 +1669,104 @@ public class RelDecorrelatorTest {
     assertThat(after, hasTree(planAfter));
   }
 
+  /** Demonstrates wrong decorrelation when two nested scalar subqueries both
+   * reference the same outer table ({@code dept d}) via the same correlation
+   * variable.
+   *
+   * <p>After {@link SubQueryRemoveRule}, the plan contains two
+   * {@code Correlate} nodes that share the same correlation variable. The
+   * inner one redefines it with {@code EMP} (8 fields) as the left input,
+   * shadowing the outer definition ({@code DEPT}, 3 fields).
+   *
+   * <p>During decorrelation, {@code findInputRel($cor1, field=0)} walks the
+   * {@code frameStack} and finds the inner scope (EMP, 8 fields) first.
+   * Because {@code 0 < 8}, it returns EMP — resolving {@code $cor1.DEPTNO}
+   * to {@code EMP.EMPNO} (field 0 of EMP) instead of {@code DEPT.DEPTNO}
+   * (field 0 of DEPT). The decorrelated plan joins on
+   * {@code EMP.EMPNO = inner_subquery.DEPTNO} ({@code =($0, $9)}) instead of
+   * the correct {@code EMP.DEPTNO = inner_subquery.DEPTNO} ({@code =($7, $9)}).
+   * End-to-end, the query returns NULLs instead of the correct department
+   * numbers. */
+  @Test void testShadowingBugWithNestedSubqueries() {
+    final FrameworkConfig frameworkConfig = config().build();
+    final RelBuilder builder = RelBuilder.create(frameworkConfig);
+    final RelOptCluster cluster = builder.getCluster();
+    final Planner planner = Frameworks.getPlanner(frameworkConfig);
+
+    // Both the outer and inner scalar subqueries reference d.deptno.
+    // SubQueryRemoveRule creates two Correlate($cor1) nodes — the inner one
+    // incorrectly redefines $cor1 with EMP as the left input.
+    final String sql = ""
+        + "select d.deptno,\n"
+        + "  (select\n"
+        + "    (select e2.deptno from emp e2 where e2.deptno = d.deptno LIMIT 1)\n"
+        + "   from emp e where e.deptno = d.deptno LIMIT 1\n"
+        + "  ) as cnt\n"
+        + "from dept as d";
+    final RelNode originalRel;
+    try {
+      final SqlNode parse = planner.parse(sql);
+      final SqlNode validate = planner.validate(parse);
+      originalRel = planner.rel(validate).rel;
+    } catch (Exception e) {
+      throw TestUtil.rethrow(e);
+    }
+
+    final HepProgram hepProgram = HepProgram.builder()
+        .addRuleCollection(
+            ImmutableList.of(
+                CoreRules.FILTER_SUB_QUERY_TO_CORRELATE,
+                CoreRules.PROJECT_SUB_QUERY_TO_CORRELATE,
+                CoreRules.JOIN_SUB_QUERY_TO_CORRELATE))
+        .build();
+    final Program program =
+        Programs.of(hepProgram, true,
+            requireNonNull(cluster.getMetadataProvider()));
+    final RelNode before =
+        program.run(cluster.getPlanner(), originalRel, cluster.traitSet(),
+            Collections.emptyList(), Collections.emptyList());
+
+    // After SubQueryRemoveRule: nested Correlates both using $cor1.
+    // The inner Correlate is inside the RIGHT subtree of the outer.
+    final String planBefore = ""
+        + "LogicalProject(DEPTNO=[$0], CNT=[$3])\n"
+        + "  LogicalCorrelate(correlation=[$cor1], joinType=[left], requiredColumns=[{0}])\n"
+        + "    LogicalTableScan(table=[[scott, DEPT]])\n"
+        + "    LogicalSort(fetch=[1])\n"
+        + "      LogicalProject(EXPR$0=[$8])\n"
+        + "        LogicalCorrelate(correlation=[$cor1], joinType=[left], requiredColumns=[{0}])\n"
+        + "          LogicalFilter(condition=[=($7, $cor1.DEPTNO)])\n"
+        + "            LogicalTableScan(table=[[scott, EMP]])\n"
+        + "          LogicalSort(fetch=[1])\n"
+        + "            LogicalProject(DEPTNO=[$7])\n"
+        + "              LogicalFilter(condition=[=($7, $cor1.DEPTNO)])\n"
+        + "                LogicalTableScan(table=[[scott, EMP]])\n";
+    assertThat(before, hasTree(planBefore));
+
+    final RelNode after =
+        RelDecorrelator.decorrelateQuery(before, builder,
+            RuleSets.ofList(Collections.emptyList()),
+            RuleSets.ofList(Collections.emptyList()));
+
+    // BUG: the join condition is =($0, $9) i.e. EMP.EMPNO = inner_subquery.DEPTNO
+    // instead of the correct =($7, $9) i.e. EMP.DEPTNO = inner_subquery.DEPTNO.
+    // findInputRel resolves $cor1.field0 to EMP (8 fields) not DEPT (3 fields).
+    final String planAfter = ""
+        + "LogicalProject(DEPTNO=[$0], CNT=[$3])\n"
+        + "  LogicalJoin(condition=[=($0, $4)], joinType=[left])\n"
+        + "    LogicalTableScan(table=[[scott, DEPT]])\n"
+        + "    LogicalFilter(condition=[<=($2, 1)])\n"
+        + "      LogicalProject(EXPR$0=[$8], DEPTNO=[$7], rn=[ROW_NUMBER() OVER (PARTITION BY $7)])\n"
+        + "        LogicalJoin(condition=[=($0, $9)], joinType=[left])\n"
+        + "          LogicalFilter(condition=[IS NOT NULL($7)])\n"
+        + "            LogicalTableScan(table=[[scott, EMP]])\n"
+        + "          LogicalFilter(condition=[<=($2, 1)])\n"
+        + "            LogicalProject(DEPTNO=[$7], DEPTNO1=[$7], rn=[ROW_NUMBER() OVER (PARTITION BY $7)])\n"
+        + "              LogicalFilter(condition=[IS NOT NULL($7)])\n"
+        + "                LogicalTableScan(table=[[scott, EMP]])\n";
+    assertThat(after, hasTree(planAfter));
+  }
+
   /** Test case for <a href="https://issues.apache.org/jira/browse/CALCITE-5390">[CALCITE-5390]
    * RelDecorrelator throws NullPointerException</a>. */
   @Test void testCorrelationLexicalScoping() {
