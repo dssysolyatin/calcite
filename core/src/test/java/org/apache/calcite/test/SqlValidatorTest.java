@@ -5201,19 +5201,22 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
         "GROUP_ID operator may only occur in an aggregate query";
     final String groupIdWrongClause =
         "GROUP_ID operator may only occur in SELECT, HAVING or ORDER BY clause";
+    final String groupIdInvalidArgumentNumber =
+        "Invalid number of arguments to function 'GROUP_ID'. Was expecting 0 arguments";
 
     sql("select deptno, group_id() from emp group by deptno").ok();
     sql("select deptno, ^group_id^ as x from emp group by deptno")
         .fails("Column 'GROUP_ID' not found in any table");
     sql("select deptno, ^group_id(deptno)^ from emp group by deptno")
-        .fails("Invalid number of arguments to function 'GROUP_ID'\\. "
-            + "Was expecting 0 arguments");
+        .fails(groupIdInvalidArgumentNumber);
     // Oracle throws "GROUPING function only supported with GROUP BY CUBE or
     // ROLLUP"
     sql("select ^group_id()^ from emp")
         .fails(groupIdOnlyInAggregate);
-    sql("select deptno from emp order by ^group_id(deptno)^")
+    sql("select deptno from emp order by ^group_id()^")
         .fails(groupIdOnlyInAggregate);
+    sql("select deptno from emp order by ^group_id(deptno)^")
+        .fails(groupIdInvalidArgumentNumber);
     // Oracle throws "GROUPING function only supported with GROUP BY CUBE or
     // ROLLUP"
     sql("select 1 from emp order by ^group_id()^")
