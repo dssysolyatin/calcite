@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlLambda;
 import org.apache.calcite.sql.SqlOperandCountRange;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
@@ -39,6 +40,7 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SameOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
+import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -1489,8 +1491,44 @@ public abstract class SqlLibraryOperators {
   @LibraryOperator(libraries = {SPARK})
   public static final SqlFunction EXISTS =
       SqlBasicFunction.create("EXISTS",
-          ReturnTypes.BOOLEAN_NULLABLE,
-          OperandTypes.EXISTS);
+              ReturnTypes.BOOLEAN_NULLABLE,
+              OperandTypes.sequence(
+                  "EXISTS(<ARRAY>, <FUNCTION(ARRAY_ELEMENT_TYPE)->BOOLEAN>)",
+                  OperandTypes.ARRAY,
+                  OperandTypes.function(SqlTypeFamily.BOOLEAN, SqlTypeFamily.ANY)))
+          .withOperandTypeInference(inferArrayLambdaType(ReturnTypes.BOOLEAN));
+
+  /**
+   * Creates an {@link SqlOperandTypeInference} for array higher-order
+   * functions (EXISTS, TRANSFORM, FILTER, etc.).
+   *
+   * <p>Derives the lambda parameter type from the array element type
+   * (operand 0) and sets the lambda operand (operand 1) to a
+   * {@link FunctionSqlType}. The lambda return type is inferred by the
+   * given {@code lambdaReturnType} strategy.
+   */
+  private static SqlOperandTypeInference inferArrayLambdaType(
+      SqlReturnTypeInference lambdaReturnType) {
+    return (callBinding, returnType, operandTypes) -> {
+      if (callBinding.getOperandCount() < 2
+          || !(callBinding.operand(1) instanceof SqlLambda)) {
+        return;
+      }
+      final RelDataType arrayType =
+          SqlTypeUtil.deriveType(callBinding, callBinding.operand(0));
+      final RelDataType componentType = arrayType.getComponentType();
+      if (componentType == null) {
+        return;
+      }
+      final RelDataTypeFactory tf = callBinding.getTypeFactory();
+      final RelDataType paramRowType = tf.createStructType(
+          ImmutableList.of(componentType), ImmutableList.of("$0"));
+      final RelDataType funcReturnType =
+          lambdaReturnType.inferReturnType(callBinding);
+      operandTypes[1] =
+          tf.createFunctionSqlType(paramRowType, funcReturnType);
+    };
+  }
 
   @SuppressWarnings("argument.type.incompatible")
   private static RelDataType arrayCompactReturnType(SqlOperatorBinding opBinding) {

@@ -608,6 +608,15 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
     expr("exp(3.67)").ok();
   }
 
+  @Test void testLambdaExpressionWithRowParameter() {
+    final String sql = "select \"EXISTS\"(array(ROW(1, false), ROW(2, true)), x -> x.\"EXPR$0\" IN (1,2,3,4))";
+    fixture()
+        .withFactory(c ->
+            c.withOperatorTable(t -> SqlValidatorTest.operatorTableFor(SqlLibrary.SPARK)))
+        .withSql(sql)
+        .ok();
+  }
+
   @Test void testArithmeticOperatorsFails() {
     expr("^power(2,'abc')^")
         .withTypeCoercion(false)
@@ -7913,15 +7922,16 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
             + "'HIGHER_ORDER_FUNCTION\\(<INTEGER>, <NULL>\\)'.*");
     s.withSql("select ^HIGHER_ORDER_FUNCTION(1, (x, y, z) -> x + 1)^")
         .fails("Cannot apply '(?s).*HIGHER_ORDER_FUNCTION' to arguments of type "
-            + "'HIGHER_ORDER_FUNCTION\\(<INTEGER>, <FUNCTION\\(ANY, ANY, ANY\\) -> ANY>\\)'.*");
+            + "'HIGHER_ORDER_FUNCTION\\(<INTEGER>,"
+            + " <FUNCTION\\(VARCHAR, ANY, ANY\\) -> INTEGER>\\)'.*");
 
     // test for illegal parameters
     s.withSql("select HIGHER_ORDER_FUNCTION(1, (x, y) -> x + 1 + ^emp.deptno^) from emp")
         .fails("Param 'EMP\\.DEPTNO' not found in lambda expression "
-            + "'\\(`X`, `Y`\\) -> `X` \\+ 1 \\+ `EMP`\\.`DEPTNO`'");
+            + "'\\(`X`, `Y`\\) -> CAST\\(`X` AS INTEGER\\) \\+ 1 \\+ `EMP`\\.`DEPTNO`'");
     s.withSql("select HIGHER_ORDER_FUNCTION(1, (x, y) -> x + 1 + ^deptno^) from emp")
         .fails("Param 'DEPTNO' not found in lambda expression "
-            + "'\\(`X`, `Y`\\) -> `X` \\+ 1 \\+ `DEPTNO`'");
+            + "'\\(`X`, `Y`\\) -> CAST\\(`X` AS INTEGER\\) \\+ 1 \\+ `DEPTNO`'");
   }
 
   /** Test case for <a href="https://issues.apache.org/jira/browse/CALCITE-7193">[CALCITE-7193]

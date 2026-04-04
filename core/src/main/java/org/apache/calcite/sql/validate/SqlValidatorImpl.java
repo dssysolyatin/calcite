@@ -97,6 +97,7 @@ import org.apache.calcite.sql.fun.SqlInternalOperators;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.AssignableOperandTypeChecker;
+import org.apache.calcite.sql.type.FunctionSqlType;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
@@ -2326,9 +2327,26 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
       }
       for (int i = 0; i < operands.size(); ++i) {
         final SqlNode operand = operands.get(i);
+        final RelDataType operandType = operandTypes[i];
         if (operand != null) {
+          if (operand instanceof SqlLambda && operandType instanceof FunctionSqlType) {
+            setLambdaScope((SqlLambda) operand, (FunctionSqlType) operandType);
+          }
           inferUnknownTypes(operandTypes[i], scope, operand);
         }
+      }
+    }
+  }
+
+  private void setLambdaScope(SqlLambda lambda, FunctionSqlType functionSqlType) {
+    final List<RelDataTypeField> paramFields =
+        functionSqlType.getParameterTypes().getFieldList();
+    if (paramFields.size() == lambda.getParameters().size()) {
+      final SqlLambdaScope lambdaScope =
+          (SqlLambdaScope) getLambdaScope(lambda);
+      for (RelDataTypeField paramField : paramFields) {
+        String paramName = lambda.getParameters().get(paramField.getIndex()).toString();
+        lambdaScope.getParameterTypes().put(paramName, paramField.getType());
       }
     }
   }

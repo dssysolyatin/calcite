@@ -21,7 +21,6 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLambda;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.Litmus;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -62,15 +61,12 @@ public class SqlLambdaScope extends ListScope {
   }
 
   @Override public SqlQualified fullyQualify(SqlIdentifier identifier) {
-    boolean found = lambdaExpr.getParameters()
-        .stream()
-        .anyMatch(param -> param.equalsDeep(identifier, Litmus.IGNORE));
-    if (found) {
+    if (parameterTypes.containsKey(identifier.names.get(0))) {
       return SqlQualified.create(this, 1, null, identifier);
-    } else {
-      throw validator.newValidationError(identifier,
-          RESOURCE.paramNotFoundInLambdaExpression(identifier.toString(), lambdaExpr.toString()));
     }
+    throw validator.newValidationError(identifier,
+        RESOURCE.paramNotFoundInLambdaExpression(
+            identifier.toString(), lambdaExpr.toString()));
   }
 
   @Override public @Nullable RelDataType resolveColumn(String columnName, SqlNode ctx) {
